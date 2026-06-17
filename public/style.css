@@ -1,0 +1,64 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #1f2430;
+  background: #f7f8fa;
+}
+
+#sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  border-right: 1px solid #e2e5ea;
+  background: #fff;
+  padding: 20px 18px;
+  overflow-y: auto;
+}
+
+#sidebar h1 { font-size: 20px; margin: 0 0 20px; }
+#sidebar h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: #8a91a0; margin: 22px 0 8px; }
+
+.control { margin-bottom: 16px; }
+.control label { display: block; font-size: 12px; color: #8a91a0; margin-bottom: 4px; }
+.control input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d6dae1;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+ul { list-style: none; margin: 0; padding: 0; }
+
+#noteList li, #searchResults li {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+#noteList li:hover, #searchResults li:hover { background: #eef1f6; }
+#noteList li.active { background: #e0e9ff; font-weight: 600; }
+
+#searchResults { margin-top: 8px; }
+#searchResults li { border: 1px solid #eef1f6; margin-bottom: 6px; }
+#searchResults .r-date { font-weight: 600; font-size: 13px; }
+#searchResults .r-snippet { color: #6b7280; font-size: 12px; margin-top: 2px; }
+
+main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #e2e5ea;
+  background: #fff;
+}
+header h2 { margin: 0; font-size: 20px; }
+#status { font-size: 13px; color: #8a91a0; }
+
+main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding: 16px 24px; }
+.CodeMirror { flex: 1; border-radius: 8px; }

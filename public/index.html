@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Notes</title>
+  <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <aside id="sidebar">
+    <h1>📓 Daily Notes</h1>
+
+    <div class="control">
+      <label for="datePicker">Jump to date</label>
+      <input type="date" id="datePicker" />
+    </div>
+
+    <div class="control">
+      <label for="searchBox">Search notes</label>
+      <input type="search" id="searchBox" placeholder="search content…" autocomplete="off" />
+      <ul id="searchResults"></ul>
+    </div>
+
+    <h2>All notes</h2>
+    <ul id="noteList"></ul>
+  </aside>
+
+  <main>
+    <header>
+      <h2 id="currentDate">—</h2>
+      <span id="status"></span>
+    </header>
+    <textarea id="editor"></textarea>
+  </main>
+
+  <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
