@@ -20,11 +20,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let notes; // collection handle, set on startup
 
-// List all dates that have a note (newest first) — powers the date sidebar.
+// List dates that have a note (newest first) — powers the date sidebar.
+// ?archived=true lists archived notes instead of active ones.
 app.get('/api/notes', async (req, res, next) => {
   try {
+    const wantArchived = req.query.archived === 'true';
+    const filter = wantArchived ? { archived: true } : { archived: { $ne: true } };
     const docs = await notes
-      .find({}, { projection: { _id: 0, date: 1, updatedAt: 1 } })
+      .find(filter, { projection: { _id: 0, date: 1, updatedAt: 1, archived: 1 } })
       .sort({ date: -1 })
       .toArray();
     res.json(docs);
@@ -33,14 +36,14 @@ app.get('/api/notes', async (req, res, next) => {
   }
 });
 
-// Full-text search across note content.
+// Full-text search across note content. Archived notes are excluded.
 app.get('/api/search', async (req, res, next) => {
   try {
     const q = (req.query.q || '').trim();
     if (!q) return res.json([]);
     const docs = await notes
       .find(
-        { $text: { $search: q } },
+        { $text: { $search: q }, archived: { $ne: true } },
         { projection: { _id: 0, date: 1, content: 1, score: { $meta: 'textScore' } } }
       )
       .sort({ score: { $meta: 'textScore' } })
@@ -140,7 +143,7 @@ app.get('/api/notes/:date', async (req, res, next) => {
     const { date } = req.params;
     if (!DATE_RE.test(date)) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
     const doc = await notes.findOne({ date }, { projection: { _id: 0 } });
-    res.json(doc || { date, content: '', updatedAt: null });
+    res.json(doc || { date, content: '', updatedAt: null, archived: false });
   } catch (err) {
     next(err);
   }
@@ -163,6 +166,26 @@ app.put('/api/notes/:date', async (req, res, next) => {
     next(err);
   }
 });
+
+// Archive / restore a day. Soft-delete: the note stays in the store but is
+// hidden from the active list and search.
+app.post('/api/notes/:date/archive', (req, res, next) => setArchived(req, res, next, true));
+app.post('/api/notes/:date/unarchive', (req, res, next) => setArchived(req, res, next, false));
+
+async function setArchived(req, res, next, archived) {
+  try {
+    const { date } = req.params;
+    if (!DATE_RE.test(date)) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+    const update = archived
+      ? { $set: { archived: true, archivedAt: new Date() } }
+      : { $set: { archived: false }, $unset: { archivedAt: '' } };
+    const result = await notes.updateOne({ date }, update);
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'no note for that date' });
+    res.json({ date, archived });
+  } catch (err) {
+    next(err);
+  }
+}
 
 app.use((err, req, res, next) => {
   console.error(err);

@@ -22,7 +22,8 @@
       <ul id="searchResults"></ul>
     </div>
 
-    <h2>All notes</h2>
+    <h2 id="notesHeading">All notes</h2>
+    <label class="archived-toggle"><input type="checkbox" id="showArchived" /> Show archived</label>
     <ul id="noteList"></ul>
   </aside>
 
@@ -33,6 +34,7 @@
         <span id="status"></span>
         <select id="modelSelect" title="Ollama model used for summaries"></select>
         <button id="summarizeBtn" title="Summarize this note with local Ollama">✨ Summarize</button>
+        <button id="archiveBtn" title="Archive this day (kept in the store, hidden from the list)">🗄 Archive</button>
       </div>
     </header>
     <div id="summaryPanel" hidden>

@@ -21,6 +21,20 @@ body {
 #sidebar h1 { font-size: 20px; margin: 0 0 20px; }
 #sidebar h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: #8a91a0; margin: 22px 0 8px; }
 
+.archived-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8a91a0; margin-bottom: 8px; cursor: pointer; }
+.archived-toggle input { margin: 0; }
+
+#archiveBtn {
+  border: 1px solid #d6dae1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+#archiveBtn:hover:not(:disabled) { background: #eef1f6; }
+#archiveBtn:disabled { opacity: .6; cursor: default; }
+
 .control { margin-bottom: 16px; }
 .control label { display: block; font-size: 12px; color: #8a91a0; margin-bottom: 4px; }
 .control input {

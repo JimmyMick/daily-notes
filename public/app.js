@@ -27,6 +27,9 @@ const searchResults = document.getElementById('searchResults');
 const noteList = document.getElementById('noteList');
 const currentDateEl = document.getElementById('currentDate');
 const statusEl = document.getElementById('status');
+const archiveBtn = document.getElementById('archiveBtn');
+const showArchived = document.getElementById('showArchived');
+const notesHeading = document.getElementById('notesHeading');
 
 // --- editor change -> debounced autosave ----------------------------------
 editor.codemirror.on('change', () => {
@@ -67,10 +70,20 @@ async function loadDate(date) {
     const doc = await res.json();
     editor.value(doc.content || '');
     statusEl.textContent = doc.updatedAt ? 'loaded' : 'new note';
+    setArchiveButton(!!doc.archived);
   } finally {
     loading = false;
   }
   highlightActive();
+}
+
+let currentArchived = false;
+function setArchiveButton(archived) {
+  currentArchived = archived;
+  archiveBtn.textContent = archived ? '♻ Restore' : '🗄 Archive';
+  archiveBtn.title = archived
+    ? 'Restore this day to the active list'
+    : 'Archive this day (kept in the store, hidden from the list)';
 }
 
 function formatHeading(date) {
@@ -81,9 +94,18 @@ function formatHeading(date) {
 
 // --- sidebar: all notes ---------------------------------------------------
 async function refreshNoteList() {
-  const res = await fetch('/api/notes');
+  const archived = showArchived.checked;
+  const res = await fetch(`/api/notes?archived=${archived}`);
   const docs = await res.json();
+  notesHeading.textContent = archived ? 'Archived notes' : 'All notes';
   noteList.innerHTML = '';
+  if (!docs.length) {
+    const li = document.createElement('li');
+    li.textContent = archived ? 'No archived notes' : 'No notes yet';
+    li.style.color = '#8a91a0';
+    li.style.cursor = 'default';
+    noteList.appendChild(li);
+  }
   for (const doc of docs) {
     const li = document.createElement('li');
     li.textContent = doc.date;
@@ -93,6 +115,27 @@ async function refreshNoteList() {
   }
   highlightActive();
 }
+
+showArchived.addEventListener('change', refreshNoteList);
+
+// Archive / restore the current day.
+archiveBtn.addEventListener('click', async () => {
+  const action = currentArchived ? 'unarchive' : 'archive';
+  archiveBtn.disabled = true;
+  try {
+    const res = await fetch(`/api/notes/${currentDate}/${action}`, { method: 'POST' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      statusEl.textContent = `⚠️ ${data.error || 'archive failed'}`;
+      return;
+    }
+    setArchiveButton(!currentArchived);
+    statusEl.textContent = currentArchived ? 'archived' : 'restored';
+    await refreshNoteList();
+  } finally {
+    archiveBtn.disabled = false;
+  }
+});
 
 function highlightActive() {
   for (const li of noteList.children) {
