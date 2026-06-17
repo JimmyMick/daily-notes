@@ -2,7 +2,7 @@
 
 // Export every note to a markdown file (one per day) under BACKUP_DIR.
 // Each file carries a small frontmatter block so restore.js can round-trip it.
-// Run: docker compose exec app npm run backup
+// Usable as a CLI (npm run backup) or imported for the scheduled backup.
 
 const fs = require('fs/promises');
 const path = require('path');
@@ -25,24 +25,32 @@ function frontmatter(doc) {
   return lines.join('\n');
 }
 
-async function main() {
-  const client = new MongoClient(MONGO_URI);
+// Export all notes to BACKUP_DIR. Returns the number of notes written.
+async function runBackup({ mongoUri = MONGO_URI, dbName = DB_NAME, backupDir = BACKUP_DIR } = {}) {
+  const client = new MongoClient(mongoUri);
   await client.connect();
   try {
-    const notes = client.db(DB_NAME).collection('notes');
+    const notes = client.db(dbName).collection('notes');
     const docs = await notes.find({}).sort({ date: 1 }).toArray();
-    await fs.mkdir(BACKUP_DIR, { recursive: true });
+    await fs.mkdir(backupDir, { recursive: true });
     for (const doc of docs) {
-      const file = path.join(BACKUP_DIR, `${doc.date}.md`);
+      const file = path.join(backupDir, `${doc.date}.md`);
       await fs.writeFile(file, frontmatter(doc) + (doc.content || '') + '\n', 'utf8');
     }
-    console.log(`Backed up ${docs.length} note(s) to ${BACKUP_DIR}`);
+    return docs.length;
   } finally {
     await client.close();
   }
 }
 
-main().catch((err) => {
-  console.error('backup failed:', err);
-  process.exit(1);
-});
+module.exports = { runBackup };
+
+// Run as a CLI when invoked directly.
+if (require.main === module) {
+  runBackup()
+    .then((n) => console.log(`Backed up ${n} note(s) to ${BACKUP_DIR}`))
+    .catch((err) => {
+      console.error('backup failed:', err);
+      process.exit(1);
+    });
+}

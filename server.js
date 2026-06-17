@@ -3,6 +3,7 @@
 const path = require('path');
 const express = require('express');
 const { MongoClient } = require('mongodb');
+const { runBackup } = require('./backup');
 
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
@@ -10,6 +11,10 @@ const DB_NAME = process.env.DB_NAME || 'daily_notes';
 // Ollama runs on the host; from inside the container reach it via host.docker.internal.
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:7b-instruct';
+// Scheduled daily backup. Disable with BACKUP_SCHEDULE=off; set the hour (0-23
+// local time) with BACKUP_HOUR (default 2am).
+const BACKUP_SCHEDULE = (process.env.BACKUP_SCHEDULE || 'on').toLowerCase();
+const BACKUP_HOUR = Math.min(23, Math.max(0, parseInt(process.env.BACKUP_HOUR || '2', 10) || 0));
 
 // Matches YYYY-MM-DD. One document per day, keyed by this string.
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -56,6 +61,16 @@ app.get('/api/search', async (req, res, next) => {
       snippet: makeSnippet(d.content, q),
     }));
     res.json(results);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Trigger a backup on demand (also used by the scheduled job).
+app.post('/api/backup', async (req, res, next) => {
+  try {
+    const count = await runBackup();
+    res.json({ ok: true, count });
   } catch (err) {
     next(err);
   }
@@ -212,6 +227,31 @@ async function start() {
   // Full-text search over content.
   await notes.createIndex({ content: 'text' });
   app.listen(PORT, () => console.log(`daily-notes listening on :${PORT}`));
+  if (BACKUP_SCHEDULE !== 'off') scheduleDailyBackup();
+}
+
+// Schedule a backup for the next BACKUP_HOUR, then every 24h. No cron dep:
+// compute ms to the next occurrence and chain setTimeout -> setInterval.
+function scheduleDailyBackup() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(BACKUP_HOUR, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  const delay = next - now;
+  console.log(`scheduled daily backup at ${String(BACKUP_HOUR).padStart(2, '0')}:00 (next in ${Math.round(delay / 3.6e6)}h)`);
+  setTimeout(() => {
+    doBackup();
+    setInterval(doBackup, 24 * 60 * 60 * 1000);
+  }, delay);
+}
+
+async function doBackup() {
+  try {
+    const n = await runBackup();
+    console.log(`[scheduled backup] wrote ${n} note(s)`);
+  } catch (err) {
+    console.error('[scheduled backup] failed:', err.message);
+  }
 }
 
 start().catch((err) => {

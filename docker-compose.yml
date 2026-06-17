@@ -11,6 +11,9 @@ services:
       OLLAMA_URL: http://host.docker.internal:11434
       OLLAMA_MODEL: qwen2.5:7b-instruct
       BACKUP_DIR: /backups
+      # Daily backup: BACKUP_SCHEDULE=on|off, BACKUP_HOUR=0-23 (local time).
+      BACKUP_SCHEDULE: "on"
+      BACKUP_HOUR: "2"
     volumes:
       # Markdown backups land here on the host (daily-notes/backups).
       - ./backups:/backups
