@@ -22,8 +22,13 @@ model and shows a bullet-point summary. Ollama runs on the **host**; the contain
 reaches it via `host.docker.internal` (wired up in `docker-compose.yml`).
 
 Default model is `qwen2.5:7b-instruct` — a good speed/quality balance for notes.
-Pull it once with `ollama pull qwen2.5:7b-instruct`. Swap models with the
-`OLLAMA_MODEL` env var (e.g. a larger model for deeper summaries).
+Pull it once with `ollama pull qwen2.5:7b-instruct`. Pick any installed model
+from the dropdown per summary, or change the default with `OLLAMA_MODEL`.
+
+Summaries **stream token-by-token** as the model generates them, so larger
+models stay responsive. Use **Insert into note** to append a summary under a
+`## Summary` heading. (A first call on a cold model pauses while Ollama loads
+it into memory, then streams.)
 
 ## Run it
 

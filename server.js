@@ -72,34 +72,65 @@ app.get('/api/models', async (req, res) => {
   }
 });
 
-// Summarize note content via local Ollama. Body: { content, model? }.
+// Summarize note content via local Ollama, streaming tokens to the client.
+// Body: { content, model? }. Streams plain-text tokens as they arrive.
 app.post('/api/summarize', async (req, res, next) => {
+  const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
+  const model = (req.body.model || OLLAMA_MODEL).trim();
+  if (!content) return res.status(400).json({ error: 'nothing to summarize' });
+
+  const prompt =
+    'Summarize the following daily notes into a few concise bullet points. ' +
+    'Capture key tasks, decisions, and takeaways. Use markdown bullets. ' +
+    'Do not add anything that is not in the notes.\n\n---\n' + content;
+
+  let r;
   try {
-    const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
-    const model = (req.body.model || OLLAMA_MODEL).trim();
-    if (!content) return res.status(400).json({ error: 'nothing to summarize' });
-
-    const prompt =
-      'Summarize the following daily notes into a few concise bullet points. ' +
-      'Capture key tasks, decisions, and takeaways. Use markdown bullets. ' +
-      'Do not add anything that is not in the notes.\n\n---\n' + content;
-
-    const r = await fetch(`${OLLAMA_URL}/api/generate`, {
+    r = await fetch(`${OLLAMA_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, prompt, stream: false }),
+      body: JSON.stringify({ model, prompt, stream: true }),
     });
-    if (!r.ok) {
-      const detail = await r.text().catch(() => '');
-      return res.status(502).json({ error: `Ollama error (${r.status})`, detail });
-    }
-    const data = await r.json();
-    res.json({ summary: (data.response || '').trim(), model });
   } catch (err) {
     if (err.cause && err.cause.code === 'ECONNREFUSED') {
       return res.status(502).json({ error: `Cannot reach Ollama at ${OLLAMA_URL}` });
     }
-    next(err);
+    return next(err);
+  }
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '');
+    return res.status(502).json({ error: `Ollama error (${r.status})`, detail });
+  }
+
+  // Committed to streaming. Forward each NDJSON line's `response` token.
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('X-Model', model);
+  res.setHeader('Cache-Control', 'no-cache');
+  res.flushHeaders();
+
+  let buffer = '';
+  const decoder = new TextDecoder();
+  try {
+    for await (const chunk of r.body) {
+      buffer += decoder.decode(chunk, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.response) res.write(obj.response);
+          if (obj.done) return res.end();
+        } catch {
+          // partial/non-JSON line; ignore
+        }
+      }
+    }
+    res.end();
+  } catch (err) {
+    // Stream broke mid-flight — close the response; client shows what it has.
+    res.end();
   }
 });
 

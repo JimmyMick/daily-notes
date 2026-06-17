@@ -185,13 +185,23 @@ summarizeBtn.addEventListener('click', async () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content, model: modelSelect.value }),
     });
-    const data = await res.json();
     if (!res.ok) {
+      // Errors come back as JSON before any streaming starts.
+      const data = await res.json().catch(() => ({}));
       summaryBody.textContent = `⚠️ ${data.error || 'Summarize failed'}${data.detail ? '\n' + data.detail : ''}`;
     } else {
-      lastSummary = data.summary || '';
+      summaryModel.textContent = `via ${res.headers.get('X-Model') || modelSelect.value}`;
+      summaryBody.textContent = '';
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        lastSummary += decoder.decode(value, { stream: true });
+        summaryBody.textContent = lastSummary;
+      }
+      lastSummary = lastSummary.trim();
       summaryBody.textContent = lastSummary || '(empty summary)';
-      summaryModel.textContent = data.model ? `via ${data.model}` : '';
       insertSummaryBtn.hidden = !lastSummary;
     }
   } catch (e) {
