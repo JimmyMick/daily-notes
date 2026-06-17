@@ -31,7 +31,9 @@ body {
   font-size: 14px;
 }
 
-ul { list-style: none; margin: 0; padding: 0; }
+/* Scope the list reset to the sidebar lists only — a global `ul` reset
+   also strips bullets/indentation from lists in the markdown preview. */
+#noteList, #searchResults { list-style: none; margin: 0; padding: 0; }
 
 #noteList li, #searchResults li {
   padding: 8px 10px;
