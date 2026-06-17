@@ -35,8 +35,45 @@
         <select id="modelSelect" title="Ollama model used for summaries"></select>
         <button id="summarizeBtn" title="Summarize this note with local Ollama">✨ Summarize</button>
         <button id="archiveBtn" title="Archive this day (kept in the store, hidden from the list)">🗄 Archive</button>
+        <button id="settingsBtn" title="Settings">⚙</button>
       </div>
     </header>
+
+    <div id="settingsOverlay" hidden>
+      <div id="settingsModal">
+        <div class="settings-head">
+          <strong>Settings</strong>
+          <button id="closeSettings" title="Close">✕</button>
+        </div>
+
+        <label class="setting">
+          <span>Default summary model</span>
+          <select id="setDefaultModel"></select>
+        </label>
+
+        <label class="setting">
+          <span>Daily backup</span>
+          <input type="checkbox" id="setBackupSchedule" />
+        </label>
+
+        <label class="setting">
+          <span>Backup time</span>
+          <select id="setBackupHour"></select>
+        </label>
+
+        <div class="settings-actions">
+          <button id="backupNowBtn">⬇ Back up now</button>
+          <span id="settingsStatus"></span>
+          <button id="saveSettings" class="primary">Save</button>
+        </div>
+
+        <p class="settings-note">
+          Backups are written to the folder mounted at <code>./backups</code> in
+          <code>docker-compose.yml</code>. To change <em>where</em> on disk they
+          land, edit that volume mount.
+        </p>
+      </div>
+    </div>
     <div id="summaryPanel" hidden>
       <div class="summary-head">
         <strong>Summary</strong>

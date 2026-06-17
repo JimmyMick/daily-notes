@@ -24,6 +24,13 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 let notes; // collection handle, set on startup
+let settingsCol; // settings collection handle
+// Runtime settings, seeded from env, overridable via the Settings panel.
+let settings = {
+  backupSchedule: BACKUP_SCHEDULE, // 'on' | 'off'
+  backupHour: BACKUP_HOUR, // 0-23
+  defaultModel: OLLAMA_MODEL,
+};
 
 // List dates that have a note (newest first) — powers the date sidebar.
 // ?archived=true lists archived notes instead of active ones.
@@ -66,6 +73,33 @@ app.get('/api/search', async (req, res, next) => {
   }
 });
 
+// Read current runtime settings.
+app.get('/api/settings', (req, res) => res.json(settings));
+
+// Update runtime settings (schedule, hour, default model). Persists + applies.
+app.put('/api/settings', async (req, res, next) => {
+  try {
+    const next_ = { ...settings };
+    if (req.body.backupSchedule === 'on' || req.body.backupSchedule === 'off') {
+      next_.backupSchedule = req.body.backupSchedule;
+    }
+    if (req.body.backupHour !== undefined) {
+      const h = parseInt(req.body.backupHour, 10);
+      if (Number.isNaN(h) || h < 0 || h > 23) return res.status(400).json({ error: 'backupHour must be 0-23' });
+      next_.backupHour = h;
+    }
+    if (typeof req.body.defaultModel === 'string' && req.body.defaultModel.trim()) {
+      next_.defaultModel = req.body.defaultModel.trim();
+    }
+    settings = next_;
+    await settingsCol.updateOne({ _id: 'app' }, { $set: settings }, { upsert: true });
+    rescheduleBackup(); // apply schedule changes immediately
+    res.json(settings);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Trigger a backup on demand (also used by the scheduled job).
 app.post('/api/backup', async (req, res, next) => {
   try {
@@ -83,10 +117,10 @@ app.get('/api/models', async (req, res) => {
     if (!r.ok) return res.json({ models: [], default: OLLAMA_MODEL });
     const data = await r.json();
     const models = (data.models || []).map((m) => m.name).sort();
-    res.json({ models, default: OLLAMA_MODEL });
+    res.json({ models, default: settings.defaultModel });
   } catch (err) {
     // Ollama unreachable — return just the default so the UI still works.
-    res.json({ models: [], default: OLLAMA_MODEL });
+    res.json({ models: [], default: settings.defaultModel });
   }
 });
 
@@ -94,7 +128,7 @@ app.get('/api/models', async (req, res) => {
 // Body: { content, model? }. Streams plain-text tokens as they arrive.
 app.post('/api/summarize', async (req, res, next) => {
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
-  const model = (req.body.model || OLLAMA_MODEL).trim();
+  const model = (req.body.model || settings.defaultModel).trim();
   if (!content) return res.status(400).json({ error: 'nothing to summarize' });
 
   const prompt =
@@ -226,22 +260,44 @@ async function start() {
   await notes.createIndex({ date: 1 }, { unique: true });
   // Full-text search over content.
   await notes.createIndex({ content: 'text' });
+  settingsCol = db.collection('settings');
+  await loadSettings();
   app.listen(PORT, () => console.log(`daily-notes listening on :${PORT}`));
-  if (BACKUP_SCHEDULE !== 'off') scheduleDailyBackup();
+  rescheduleBackup();
 }
 
-// Schedule a backup for the next BACKUP_HOUR, then every 24h. No cron dep:
-// compute ms to the next occurrence and chain setTimeout -> setInterval.
-function scheduleDailyBackup() {
+// Load persisted settings (seeded from env on first run).
+async function loadSettings() {
+  const doc = await settingsCol.findOne({ _id: 'app' });
+  if (doc) {
+    settings = { backupSchedule: doc.backupSchedule, backupHour: doc.backupHour, defaultModel: doc.defaultModel };
+  } else {
+    await settingsCol.insertOne({ _id: 'app', ...settings });
+  }
+}
+
+// Schedule a backup for the next settings.backupHour, then every 24h. No cron
+// dep: compute ms to the next occurrence and chain setTimeout -> setInterval.
+// Safe to call repeatedly — clears any existing timers first.
+let backupTimer = null;
+let backupInterval = null;
+function rescheduleBackup() {
+  clearTimeout(backupTimer);
+  clearInterval(backupInterval);
+  backupTimer = backupInterval = null;
+  if (settings.backupSchedule === 'off') {
+    console.log('scheduled backup disabled');
+    return;
+  }
   const now = new Date();
   const next = new Date(now);
-  next.setHours(BACKUP_HOUR, 0, 0, 0);
+  next.setHours(settings.backupHour, 0, 0, 0);
   if (next <= now) next.setDate(next.getDate() + 1);
   const delay = next - now;
-  console.log(`scheduled daily backup at ${String(BACKUP_HOUR).padStart(2, '0')}:00 (next in ${Math.round(delay / 3.6e6)}h)`);
-  setTimeout(() => {
+  console.log(`scheduled daily backup at ${String(settings.backupHour).padStart(2, '0')}:00 (next in ${Math.round(delay / 3.6e6)}h)`);
+  backupTimer = setTimeout(() => {
     doBackup();
-    setInterval(doBackup, 24 * 60 * 60 * 1000);
+    backupInterval = setInterval(doBackup, 24 * 60 * 60 * 1000);
   }, delay);
 }
 

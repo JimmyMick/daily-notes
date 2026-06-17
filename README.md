@@ -65,8 +65,24 @@ Each file has a small frontmatter block (`date`, `archived`, `createdAt`,
 state too. `restore` upserts by date, so it's safe to re-run and only touches
 the dates present in the folder.
 
-Tip: run `backup` on a schedule (cron) for a rolling safety net. The markdown
-files are also nice to read or grep directly.
+A **daily backup runs automatically** while the app is up (default 2am local).
+Configure it in the **Settings** panel (⚙) or via env vars.
+
+The markdown files are also nice to read or grep directly.
+
+## Settings
+
+Click **⚙** in the header for an in-app Settings panel:
+
+- **Default summary model** — which Ollama model the ✨ button uses by default
+- **Daily backup** — on/off
+- **Backup time** — hour of day (local time)
+- **Back up now** — run a backup immediately
+
+Settings persist in MongoDB (a `settings` collection) and the env vars below
+just seed the first-run defaults. The backup *folder* is the Docker volume
+mount (`./backups`), changed in `docker-compose.yml` — not in the UI, since the
+container can only write to paths mounted into it.
 
 ## Data model
 
@@ -104,3 +120,7 @@ Collection `notes`:
 | `OLLAMA_URL` | `http://localhost:11434` | Compose sets this to `http://host.docker.internal:11434` |
 | `OLLAMA_MODEL` | `qwen2.5:7b-instruct` | Default summarization model |
 | `BACKUP_DIR` | `/backups` | Where markdown backups are written (mounted to `./backups`) |
+| `BACKUP_SCHEDULE` | `on` | Seeds the daily-backup on/off default (`on`/`off`) |
+| `BACKUP_HOUR` | `2` | Seeds the daily-backup hour (0–23, local time) |
+
+Env vars seed first-run defaults; the Settings panel persists overrides in MongoDB.

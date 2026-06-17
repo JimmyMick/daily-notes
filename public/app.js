@@ -255,6 +255,66 @@ summarizeBtn.addEventListener('click', async () => {
   }
 });
 
+// --- settings -------------------------------------------------------------
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const setDefaultModel = document.getElementById('setDefaultModel');
+const setBackupSchedule = document.getElementById('setBackupSchedule');
+const setBackupHour = document.getElementById('setBackupHour');
+const settingsStatus = document.getElementById('settingsStatus');
+
+// Populate the hour dropdown once (00:00 – 23:00).
+for (let h = 0; h < 24; h++) {
+  const opt = document.createElement('option');
+  opt.value = h;
+  opt.textContent = `${String(h).padStart(2, '0')}:00`;
+  setBackupHour.appendChild(opt);
+}
+
+document.getElementById('closeSettings').onclick = () => { settingsOverlay.hidden = true; };
+settingsOverlay.addEventListener('click', (e) => {
+  if (e.target === settingsOverlay) settingsOverlay.hidden = true;
+});
+
+settingsBtn.addEventListener('click', async () => {
+  settingsStatus.textContent = '';
+  // Mirror the model dropdown options into the settings select.
+  setDefaultModel.innerHTML = modelSelect.innerHTML;
+  const res = await fetch('/api/settings');
+  const s = await res.json();
+  setDefaultModel.value = s.defaultModel;
+  setBackupSchedule.checked = s.backupSchedule === 'on';
+  setBackupHour.value = s.backupHour;
+  settingsOverlay.hidden = false;
+});
+
+document.getElementById('saveSettings').addEventListener('click', async () => {
+  settingsStatus.textContent = 'saving…';
+  const res = await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      defaultModel: setDefaultModel.value,
+      backupSchedule: setBackupSchedule.checked ? 'on' : 'off',
+      backupHour: Number(setBackupHour.value),
+    }),
+  });
+  if (!res.ok) { settingsStatus.textContent = '⚠️ save failed'; return; }
+  const s = await res.json();
+  settingsStatus.textContent = 'saved ✓';
+  // Reflect the new default model in the header dropdown selection.
+  if ([...modelSelect.options].some((o) => o.value === s.defaultModel)) {
+    modelSelect.value = s.defaultModel;
+  }
+});
+
+document.getElementById('backupNowBtn').addEventListener('click', async () => {
+  settingsStatus.textContent = 'backing up…';
+  const res = await fetch('/api/backup', { method: 'POST' });
+  const data = await res.json().catch(() => ({}));
+  settingsStatus.textContent = res.ok ? `backed up ${data.count} note(s) ✓` : '⚠️ backup failed';
+});
+
 // --- date picker ----------------------------------------------------------
 datePicker.addEventListener('change', () => {
   if (datePicker.value) loadDate(datePicker.value);
