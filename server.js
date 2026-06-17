@@ -7,6 +7,9 @@ const { MongoClient } = require('mongodb');
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME || 'daily_notes';
+// Ollama runs on the host; from inside the container reach it via host.docker.internal.
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:7b-instruct';
 
 // Matches YYYY-MM-DD. One document per day, keyed by this string.
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -51,6 +54,37 @@ app.get('/api/search', async (req, res, next) => {
     }));
     res.json(results);
   } catch (err) {
+    next(err);
+  }
+});
+
+// Summarize note content via local Ollama. Body: { content, model? }.
+app.post('/api/summarize', async (req, res, next) => {
+  try {
+    const content = typeof req.body.content === 'string' ? req.body.content.trim() : '';
+    const model = (req.body.model || OLLAMA_MODEL).trim();
+    if (!content) return res.status(400).json({ error: 'nothing to summarize' });
+
+    const prompt =
+      'Summarize the following daily notes into a few concise bullet points. ' +
+      'Capture key tasks, decisions, and takeaways. Use markdown bullets. ' +
+      'Do not add anything that is not in the notes.\n\n---\n' + content;
+
+    const r = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt, stream: false }),
+    });
+    if (!r.ok) {
+      const detail = await r.text().catch(() => '');
+      return res.status(502).json({ error: `Ollama error (${r.status})`, detail });
+    }
+    const data = await r.json();
+    res.json({ summary: (data.response || '').trim(), model });
+  } catch (err) {
+    if (err.cause && err.cause.code === 'ECONNREFUSED') {
+      return res.status(502).json({ error: `Cannot reach Ollama at ${OLLAMA_URL}` });
+    }
     next(err);
   }
 });

@@ -29,8 +29,19 @@
   <main>
     <header>
       <h2 id="currentDate">—</h2>
-      <span id="status"></span>
+      <div class="header-right">
+        <span id="status"></span>
+        <button id="summarizeBtn" title="Summarize this note with local Ollama">✨ Summarize</button>
+      </div>
     </header>
+    <div id="summaryPanel" hidden>
+      <div class="summary-head">
+        <strong>Summary</strong>
+        <span id="summaryModel"></span>
+        <button id="closeSummary" title="Close">✕</button>
+      </div>
+      <div id="summaryBody"></div>
+    </div>
     <textarea id="editor"></textarea>
   </main>
 

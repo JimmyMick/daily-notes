@@ -129,6 +129,42 @@ async function runSearch() {
   }
 }
 
+// --- summarize (local Ollama) ---------------------------------------------
+const summarizeBtn = document.getElementById('summarizeBtn');
+const summaryPanel = document.getElementById('summaryPanel');
+const summaryBody = document.getElementById('summaryBody');
+const summaryModel = document.getElementById('summaryModel');
+document.getElementById('closeSummary').onclick = () => { summaryPanel.hidden = true; };
+
+summarizeBtn.addEventListener('click', async () => {
+  const content = editor.value().trim();
+  if (!content) { return; }
+  summarizeBtn.disabled = true;
+  summarizeBtn.textContent = '… summarizing';
+  summaryPanel.hidden = false;
+  summaryModel.textContent = '';
+  summaryBody.textContent = 'Working…';
+  try {
+    const res = await fetch('/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      summaryBody.textContent = `⚠️ ${data.error || 'Summarize failed'}${data.detail ? '\n' + data.detail : ''}`;
+    } else {
+      summaryBody.textContent = data.summary || '(empty summary)';
+      summaryModel.textContent = data.model ? `via ${data.model}` : '';
+    }
+  } catch (e) {
+    summaryBody.textContent = '⚠️ Request failed';
+  } finally {
+    summarizeBtn.disabled = false;
+    summarizeBtn.textContent = '✨ Summarize';
+  }
+});
+
 // --- date picker ----------------------------------------------------------
 datePicker.addEventListener('change', () => {
   if (datePicker.value) loadDate(datePicker.value);
