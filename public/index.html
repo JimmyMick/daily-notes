@@ -31,6 +31,7 @@
       <h2 id="currentDate">—</h2>
       <div class="header-right">
         <span id="status"></span>
+        <select id="modelSelect" title="Ollama model used for summaries"></select>
         <button id="summarizeBtn" title="Summarize this note with local Ollama">✨ Summarize</button>
       </div>
     </header>
@@ -38,6 +39,7 @@
       <div class="summary-head">
         <strong>Summary</strong>
         <span id="summaryModel"></span>
+        <button id="insertSummary" title="Append this summary to the note">⤵ Insert into note</button>
         <button id="closeSummary" title="Close">✕</button>
       </div>
       <div id="summaryBody"></div>

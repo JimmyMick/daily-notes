@@ -134,7 +134,40 @@ const summarizeBtn = document.getElementById('summarizeBtn');
 const summaryPanel = document.getElementById('summaryPanel');
 const summaryBody = document.getElementById('summaryBody');
 const summaryModel = document.getElementById('summaryModel');
+const modelSelect = document.getElementById('modelSelect');
+const insertSummaryBtn = document.getElementById('insertSummary');
 document.getElementById('closeSummary').onclick = () => { summaryPanel.hidden = true; };
+
+let lastSummary = '';
+
+// Populate the model dropdown from the local Ollama install.
+async function loadModels() {
+  try {
+    const res = await fetch('/api/models');
+    const { models, default: def } = await res.json();
+    modelSelect.innerHTML = '';
+    const list = models.length ? models : [def];
+    for (const name of list) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (name === def) opt.selected = true;
+      modelSelect.appendChild(opt);
+    }
+  } catch (e) {
+    modelSelect.innerHTML = '<option>(models unavailable)</option>';
+  }
+}
+
+// Append the summary into the current note under a heading, then save.
+insertSummaryBtn.addEventListener('click', () => {
+  if (!lastSummary) return;
+  const existing = editor.value();
+  const block = `\n\n## Summary\n\n${lastSummary}\n`;
+  editor.value(existing.trimEnd() + block);
+  save();
+  summaryPanel.hidden = true;
+});
 
 summarizeBtn.addEventListener('click', async () => {
   const content = editor.value().trim();
@@ -144,18 +177,22 @@ summarizeBtn.addEventListener('click', async () => {
   summaryPanel.hidden = false;
   summaryModel.textContent = '';
   summaryBody.textContent = 'Working…';
+  insertSummaryBtn.hidden = true;
+  lastSummary = '';
   try {
     const res = await fetch('/api/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, model: modelSelect.value }),
     });
     const data = await res.json();
     if (!res.ok) {
       summaryBody.textContent = `⚠️ ${data.error || 'Summarize failed'}${data.detail ? '\n' + data.detail : ''}`;
     } else {
-      summaryBody.textContent = data.summary || '(empty summary)';
+      lastSummary = data.summary || '';
+      summaryBody.textContent = lastSummary || '(empty summary)';
       summaryModel.textContent = data.model ? `via ${data.model}` : '';
+      insertSummaryBtn.hidden = !lastSummary;
     }
   } catch (e) {
     summaryBody.textContent = '⚠️ Request failed';
@@ -172,6 +209,7 @@ datePicker.addEventListener('change', () => {
 
 // --- boot -----------------------------------------------------------------
 (async function init() {
+  await loadModels();
   await refreshNoteList();
   await loadDate(currentDate);
 })();

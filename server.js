@@ -58,6 +58,20 @@ app.get('/api/search', async (req, res, next) => {
   }
 });
 
+// List models available from the local Ollama install (for the UI dropdown).
+app.get('/api/models', async (req, res) => {
+  try {
+    const r = await fetch(`${OLLAMA_URL}/api/tags`);
+    if (!r.ok) return res.json({ models: [], default: OLLAMA_MODEL });
+    const data = await r.json();
+    const models = (data.models || []).map((m) => m.name).sort();
+    res.json({ models, default: OLLAMA_MODEL });
+  } catch (err) {
+    // Ollama unreachable — return just the default so the UI still works.
+    res.json({ models: [], default: OLLAMA_MODEL });
+  }
+});
+
 // Summarize note content via local Ollama. Body: { content, model? }.
 app.post('/api/summarize', async (req, res, next) => {
   try {
