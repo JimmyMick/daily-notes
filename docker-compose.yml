@@ -10,6 +10,10 @@ services:
       # Reach the host's Ollama from inside the container.
       OLLAMA_URL: http://host.docker.internal:11434
       OLLAMA_MODEL: qwen2.5:7b-instruct
+      BACKUP_DIR: /backups
+    volumes:
+      # Markdown backups land here on the host (daily-notes/backups).
+      - ./backups:/backups
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

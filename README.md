@@ -49,6 +49,25 @@ npm install
 npm run dev        # node --watch
 ```
 
+## Backup & restore
+
+Notes export to plain **markdown files** (one per day) so your journal is
+recoverable even without Mongo. The folder is mounted to the host at
+`daily-notes/backups/`.
+
+```bash
+docker compose exec app npm run backup    # export all notes -> backups/YYYY-MM-DD.md
+docker compose exec app npm run restore   # import backups/*.md back into Mongo (upsert)
+```
+
+Each file has a small frontmatter block (`date`, `archived`, `createdAt`,
+`updatedAt`) followed by the markdown body, so restore round-trips the archived
+state too. `restore` upserts by date, so it's safe to re-run and only touches
+the dates present in the folder.
+
+Tip: run `backup` on a schedule (cron) for a rolling safety net. The markdown
+files are also nice to read or grep directly.
+
 ## Data model
 
 Collection `notes`:
@@ -84,3 +103,4 @@ Collection `notes`:
 | `DB_NAME` | `daily_notes` | Database name |
 | `OLLAMA_URL` | `http://localhost:11434` | Compose sets this to `http://host.docker.internal:11434` |
 | `OLLAMA_MODEL` | `qwen2.5:7b-instruct` | Default summarization model |
+| `BACKUP_DIR` | `/backups` | Where markdown backups are written (mounted to `./backups`) |

@@ -6,7 +6,9 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "backup": "node backup.js",
+    "restore": "node restore.js"
   },
   "dependencies": {
     "express": "^4.21.2",
