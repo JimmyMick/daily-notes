@@ -4,6 +4,7 @@ const path = require('path');
 const express = require('express');
 const { MongoClient } = require('mongodb');
 const { runBackup } = require('./backup');
+const email = require('./email');
 
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
@@ -31,7 +32,11 @@ let settings = {
   backupSchedule: BACKUP_SCHEDULE, // 'on' | 'off'
   backupHour: BACKUP_HOUR, // 0-23
   defaultModel: OLLAMA_MODEL,
+  emailTo: process.env.GMAIL_USER || '', // default recipient for "Email note"
 };
+
+// Loose email check — enough to catch typos, not RFC-perfect.
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 // List dates that have a note (newest first) — powers the date sidebar.
 // ?archived=true lists archived notes instead of active ones.
@@ -92,6 +97,11 @@ app.put('/api/settings', async (req, res, next) => {
     if (typeof req.body.defaultModel === 'string' && req.body.defaultModel.trim()) {
       next_.defaultModel = req.body.defaultModel.trim();
     }
+    if (typeof req.body.emailTo === 'string') {
+      const v = req.body.emailTo.trim();
+      if (v && !EMAIL_RE.test(v)) return res.status(400).json({ error: 'emailTo must be a valid email' });
+      next_.emailTo = v;
+    }
     settings = next_;
     await settingsCol.updateOne({ _id: 'app' }, { $set: settings }, { upsert: true });
     rescheduleBackup(); // apply schedule changes immediately
@@ -106,6 +116,59 @@ app.post('/api/backup', async (req, res, next) => {
   try {
     const count = await performBackup();
     res.json({ ok: true, count });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Whether email is configured (Gmail user + App Password present) plus the
+// default recipient, so the UI can prefill and warn when it's not set up.
+app.get('/api/email/status', (req, res) => {
+  res.json({ configured: email.isConfigured(), from: email.from || null, defaultTo: settings.emailTo || '' });
+});
+
+// Email a note (daily or reference) via Gmail. Body: { kind, id, to }.
+//   kind 'daily'     -> id is a YYYY-MM-DD date
+//   kind 'reference' -> id is a reference slug
+app.post('/api/email', async (req, res, next) => {
+  try {
+    if (!email.isConfigured()) {
+      return res.status(503).json({
+        error: 'Email is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD, then restart.',
+      });
+    }
+    const { kind, id } = req.body;
+    const to = typeof req.body.to === 'string' ? req.body.to.trim() : '';
+    // Allow a comma-separated list; validate each address.
+    const recipients = to.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!recipients.length || !recipients.every((r) => EMAIL_RE.test(r))) {
+      return res.status(400).json({ error: 'a valid recipient is required' });
+    }
+
+    let subject, markdown;
+    if (kind === 'daily') {
+      if (!DATE_RE.test(id)) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+      const doc = await notes.findOne({ date: id });
+      if (!doc || !doc.content || !doc.content.trim()) return res.status(400).json({ error: 'note is empty' });
+      subject = `Daily note — ${id}`;
+      markdown = doc.content;
+    } else if (kind === 'reference') {
+      const doc = await references.findOne({ slug: id });
+      if (!doc) return res.status(404).json({ error: 'no such reference' });
+      if (!doc.content || !doc.content.trim()) return res.status(400).json({ error: 'note is empty' });
+      subject = `Reference note — ${doc.title}`;
+      markdown = doc.content;
+    } else {
+      return res.status(400).json({ error: 'kind must be "daily" or "reference"' });
+    }
+
+    try {
+      await email.sendNoteEmail({ to: recipients.join(', '), subject, markdown });
+    } catch (err) {
+      // Surface SMTP/auth failures clearly instead of the generic 500 handler.
+      return res.status(502).json({ error: 'send failed', detail: err.message });
+    }
+    res.json({ ok: true, to: recipients.join(', ') });
   } catch (err) {
     next(err);
   }
@@ -378,7 +441,12 @@ async function performBackup() {
 async function loadSettings() {
   const doc = await settingsCol.findOne({ _id: 'app' });
   if (doc) {
-    settings = { backupSchedule: doc.backupSchedule, backupHour: doc.backupHour, defaultModel: doc.defaultModel };
+    settings = {
+      backupSchedule: doc.backupSchedule,
+      backupHour: doc.backupHour,
+      defaultModel: doc.defaultModel,
+      emailTo: doc.emailTo || settings.emailTo || '',
+    };
   } else {
     await settingsCol.insertOne({ _id: 'app', ...settings });
   }

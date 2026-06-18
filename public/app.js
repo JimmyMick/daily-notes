@@ -380,12 +380,67 @@ summarizeBtn.addEventListener('click', async () => {
   }
 });
 
+// --- email a note ---------------------------------------------------------
+const emailBtn = document.getElementById('emailBtn');
+let emailConfig = { configured: false, defaultTo: '' };
+
+async function loadEmailConfig() {
+  try {
+    const res = await fetch('/api/email/status');
+    emailConfig = await res.json();
+  } catch (e) {
+    emailConfig = { configured: false, defaultTo: '' };
+  }
+  if (!emailConfig.configured) {
+    emailBtn.title = 'Email not configured — set GMAIL_USER and GMAIL_APP_PASSWORD';
+  }
+}
+
+emailBtn.addEventListener('click', async () => {
+  // Flush any pending edit so the emailed copy matches what's on screen.
+  clearTimeout(saveTimer);
+  if (!loading && editor.value()) await save();
+
+  const kind = mode; // 'daily' | 'reference'
+  const id = kind === 'reference' ? (currentRef && currentRef.slug) : currentDate;
+  if (!id) return;
+  if (!editor.value().trim()) { statusEl.textContent = '⚠️ nothing to email'; return; }
+  if (!emailConfig.configured) {
+    statusEl.textContent = '⚠️ email not configured (set GMAIL_USER / GMAIL_APP_PASSWORD)';
+    return;
+  }
+
+  const to = prompt('Email this note to:', emailConfig.defaultTo || '');
+  if (!to || !to.trim()) return;
+
+  statusEl.textContent = 'emailing…';
+  emailBtn.disabled = true;
+  try {
+    const res = await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kind, id, to: to.trim() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      statusEl.textContent = `⚠️ ${data.error || 'email failed'}${data.detail ? ': ' + data.detail : ''}`;
+      return;
+    }
+    statusEl.textContent = `emailed to ${data.to} ✓`;
+  } catch (e) {
+    statusEl.textContent = '⚠️ email failed';
+  } finally {
+    emailBtn.disabled = false;
+  }
+});
+
 // --- settings -------------------------------------------------------------
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsOverlay = document.getElementById('settingsOverlay');
 const setDefaultModel = document.getElementById('setDefaultModel');
 const setBackupSchedule = document.getElementById('setBackupSchedule');
 const setBackupHour = document.getElementById('setBackupHour');
+const setEmailTo = document.getElementById('setEmailTo');
 const settingsStatus = document.getElementById('settingsStatus');
 
 // Populate the hour dropdown once (00:00 – 23:00).
@@ -410,6 +465,7 @@ settingsBtn.addEventListener('click', async () => {
   setDefaultModel.value = s.defaultModel;
   setBackupSchedule.checked = s.backupSchedule === 'on';
   setBackupHour.value = s.backupHour;
+  setEmailTo.value = s.emailTo || '';
   settingsOverlay.hidden = false;
 });
 
@@ -422,11 +478,18 @@ document.getElementById('saveSettings').addEventListener('click', async () => {
       defaultModel: setDefaultModel.value,
       backupSchedule: setBackupSchedule.checked ? 'on' : 'off',
       backupHour: Number(setBackupHour.value),
+      emailTo: setEmailTo.value.trim(),
     }),
   });
-  if (!res.ok) { settingsStatus.textContent = '⚠️ save failed'; return; }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    settingsStatus.textContent = `⚠️ ${data.error || 'save failed'}`;
+    return;
+  }
   const s = await res.json();
   settingsStatus.textContent = 'saved ✓';
+  // Keep the Email button's prefill in sync with the saved default.
+  emailConfig.defaultTo = s.emailTo || '';
   // Reflect the new default model in the header dropdown selection.
   if ([...modelSelect.options].some((o) => o.value === s.defaultModel)) {
     modelSelect.value = s.defaultModel;
@@ -448,6 +511,7 @@ datePicker.addEventListener('change', () => {
 // --- boot -----------------------------------------------------------------
 (async function init() {
   await loadModels();
+  await loadEmailConfig();
   await refreshNoteList();
   await refreshRefList();
   await loadDate(currentDate);

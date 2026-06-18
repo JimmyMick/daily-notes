@@ -14,6 +14,11 @@ services:
       # Daily backup: BACKUP_SCHEDULE=on|off, BACKUP_HOUR=0-23 (local time).
       BACKUP_SCHEDULE: "on"
       BACKUP_HOUR: "2"
+      # Email a note via Gmail. Create an App Password (needs 2-Step Verification)
+      # at https://myaccount.google.com/apppasswords. Put real values in a .env
+      # file (gitignored) next to docker-compose.yml; these read from it.
+      GMAIL_USER: "${GMAIL_USER:-}"
+      GMAIL_APP_PASSWORD: "${GMAIL_APP_PASSWORD:-}"
     volumes:
       # Markdown backups land here on the host (daily-notes/backups).
       - ./backups:/backups

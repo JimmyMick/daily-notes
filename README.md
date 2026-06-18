@@ -13,6 +13,7 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 - **Jump to any date** with the date picker
 - **Search** across all note content (MongoDB text index)
 - **Summarize** a note with a local **Ollama** model (✨ button)
+- **Email a note** (daily or reference) via Gmail (✉ button)
 - Autosave as you type (debounced)
 - A sidebar list of every day that has a note
 
@@ -49,6 +50,39 @@ the sidebar, below the daily list.
 Reference notes are stored in their own `references` collection and are
 included in [backups](#backup--restore) (under `backups/references/`). They are
 not yet wired into the top search box — that searches daily notes only.
+
+## Email a note
+
+The ✉ **Email** button sends the note currently open — daily *or* reference —
+to a recipient via **Gmail**. The note's markdown is sent as the plain-text body
+plus a whitespace-preserving HTML version, so it reads cleanly in any mail
+client. The subject is `Daily note — YYYY-MM-DD` or `Reference note — <title>`.
+
+Clicking ✉ flushes any pending edit, then prompts for the recipient (prefilled
+with your default — see Settings). You can enter a comma-separated list to send
+to several people at once.
+
+### Setup (one-time)
+
+Gmail blocks plain password logins, so this uses an **App Password** over SMTP
+(no OAuth flow):
+
+1. Enable **2-Step Verification** on the Google account.
+2. Create an App Password at <https://myaccount.google.com/apppasswords>.
+3. Put the credentials in a `.env` file next to `docker-compose.yml` (it's
+   gitignored — see `.env.example`):
+
+   ```bash
+   GMAIL_USER=you@gmail.com
+   GMAIL_APP_PASSWORD=abcd efgh ijkl mnop   # spaces are fine; stripped on load
+   ```
+
+4. `docker compose up --build` (or restart) to pick up the variables.
+
+Until both are set, the ✉ button reports that email isn't configured and sends
+nothing. Mail is sent **from** `GMAIL_USER`. Set a default recipient in the
+**Settings** panel (it defaults to your own address, so you can mail notes to
+yourself).
 
 ## Run it
 
@@ -102,6 +136,7 @@ Click **⚙** in the header for an in-app Settings panel:
 - **Daily backup** — on/off
 - **Backup time** — hour of day (local time)
 - **Back up now** — run a backup immediately
+- **Email notes to** — default recipient for the ✉ button
 
 Settings persist in MongoDB (a `settings` collection) and the env vars below
 just seed the first-run defaults. The backup *folder* is the Docker volume
@@ -148,6 +183,8 @@ Collection `references` (one per named, evergreen note):
 | `PUT` | `/api/notes/:date` | Create/update a day's note (`{ "content": "…" }`) |
 | `GET` | `/api/search?q=…` | Full-text search, returns date + snippet |
 | `POST` | `/api/summarize` | Summarize content via Ollama (`{ "content": "…", "model"?: "…" }`) |
+| `GET` | `/api/email/status` | Whether Gmail is configured + the default recipient |
+| `POST` | `/api/email` | Email a note (`{ "kind": "daily"\|"reference", "id": "…", "to": "…" }`) |
 | `GET` | `/api/references` | List reference notes (alphabetical by title) |
 | `POST` | `/api/references` | Create a reference note (`{ "title": "…" }`), returns its `slug` |
 | `GET` | `/api/references/:slug` | Fetch a reference note |
@@ -166,5 +203,11 @@ Collection `references` (one per named, evergreen note):
 | `BACKUP_DIR` | `/backups` | Where markdown backups are written (mounted to `./backups`) |
 | `BACKUP_SCHEDULE` | `on` | Seeds the daily-backup on/off default (`on`/`off`) |
 | `BACKUP_HOUR` | `2` | Seeds the daily-backup hour (0–23, local time) |
+| `GMAIL_USER` | _(unset)_ | Gmail address mail is sent **from**; also seeds the default recipient |
+| `GMAIL_APP_PASSWORD` | _(unset)_ | Gmail [App Password](https://myaccount.google.com/apppasswords) (spaces stripped) |
+| `SMTP_HOST` | `smtp.gmail.com` | SMTP host (override only for non-Gmail SMTP) |
+| `SMTP_PORT` | `465` | SMTP port (`465` implicit TLS, `587` STARTTLS) |
 
-Env vars seed first-run defaults; the Settings panel persists overrides in MongoDB.
+Env vars seed first-run defaults; the Settings panel persists overrides in
+MongoDB. The Gmail **secret** (`GMAIL_APP_PASSWORD`) lives only in env / `.env`,
+never in the database or UI.
