@@ -101,7 +101,9 @@
   </main>
 
   <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
-  <script src="https://unpkg.com/marked/marked.min.js"></script>
+  <!-- Pin to match the backend (package.json) and because newer majors dropped
+       this UMD min build — an unpinned URL 404s and breaks the preview. -->
+  <script src="https://unpkg.com/marked@14.1.4/marked.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>
