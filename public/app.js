@@ -570,7 +570,21 @@ const setBackupHour = document.getElementById('setBackupHour');
 const setEmailTo = document.getElementById('setEmailTo');
 const setNewsCount = document.getElementById('setNewsCount');
 const setNewsSources = document.getElementById('setNewsSources');
+const lastBackupVal = document.getElementById('lastBackupVal');
 const settingsStatus = document.getElementById('settingsStatus');
+
+// "Jun 18, 2026, 4:37 AM (2h ago)" — absolute time plus a relative hint.
+function formatBackupTime(iso) {
+  if (!iso) return 'never';
+  const d = new Date(iso);
+  const mins = Math.round((Date.now() - d.getTime()) / 60000);
+  let rel;
+  if (mins < 1) rel = 'just now';
+  else if (mins < 60) rel = `${mins} min ago`;
+  else if (mins < 1440) rel = `${Math.round(mins / 60)}h ago`;
+  else rel = `${Math.round(mins / 1440)}d ago`;
+  return `${d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} (${rel})`;
+}
 
 // Sources <-> textarea. Each line is "Name | URL" (name optional: a bare URL is
 // fine and the server derives a name from the feed/host). Blank and #-comment
@@ -615,6 +629,7 @@ settingsBtn.addEventListener('click', async () => {
   setEmailTo.value = s.emailTo || '';
   setNewsCount.value = s.newsCount != null ? s.newsCount : 3;
   setNewsSources.value = sourcesToText(s.newsSources);
+  lastBackupVal.textContent = formatBackupTime(s.lastBackupAt);
   settingsOverlay.hidden = false;
 });
 
@@ -654,6 +669,7 @@ document.getElementById('backupNowBtn').addEventListener('click', async () => {
   const res = await fetch('/api/backup', { method: 'POST' });
   const data = await res.json().catch(() => ({}));
   settingsStatus.textContent = res.ok ? `backed up ${data.count} note(s) ✓` : '⚠️ backup failed';
+  if (res.ok) lastBackupVal.textContent = formatBackupTime(data.lastBackupAt || new Date().toISOString());
 });
 
 // --- date picker ----------------------------------------------------------

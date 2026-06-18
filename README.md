@@ -199,6 +199,7 @@ Click **⚙** in the header for an in-app Settings panel:
 - **Default summary model** — which Ollama model the ✨ button uses by default
 - **Daily backup** — on/off
 - **Backup time** — hour of day (local time)
+- **Last backup** — when the most recent backup ran (absolute time + relative hint)
 - **Back up now** — run a backup immediately
 - **Email notes to** — default recipient for the ✉ button
 - **Headlines per source** — how many headlines each news source contributes to the ticker (1–20)

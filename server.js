@@ -31,6 +31,7 @@ let notes; // collection handle, set on startup
 let references; // reference-notes collection handle (named, not dated)
 let settingsCol; // settings collection handle
 let images; // uploaded images (binary) collection handle
+let lastBackupAt = null; // when the last backup ran (Date), surfaced in settings
 
 // Image uploads: accept common image types, hold in memory, cap the size.
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -106,8 +107,8 @@ app.get('/api/search', async (req, res, next) => {
   }
 });
 
-// Read current runtime settings.
-app.get('/api/settings', (req, res) => res.json(settings));
+// Read current runtime settings (plus the last backup time, for display).
+app.get('/api/settings', (req, res) => res.json({ ...settings, lastBackupAt }));
 
 // Update runtime settings (schedule, hour, default model). Persists + applies.
 app.put('/api/settings', async (req, res, next) => {
@@ -152,7 +153,7 @@ app.put('/api/settings', async (req, res, next) => {
 app.post('/api/backup', async (req, res, next) => {
   try {
     const count = await performBackup();
-    res.json({ ok: true, count });
+    res.json({ ok: true, count, lastBackupAt });
   } catch (err) {
     next(err);
   }
@@ -558,13 +559,15 @@ async function catchUpBackup() {
 // Run a backup and record when it happened (powers the catch-up check).
 async function performBackup() {
   const n = await runBackup();
-  await settingsCol.updateOne({ _id: 'app' }, { $set: { lastBackupAt: new Date() } }, { upsert: true });
+  lastBackupAt = new Date();
+  await settingsCol.updateOne({ _id: 'app' }, { $set: { lastBackupAt } }, { upsert: true });
   return n;
 }
 
 // Load persisted settings (seeded from env on first run).
 async function loadSettings() {
   const doc = await settingsCol.findOne({ _id: 'app' });
+  if (doc && doc.lastBackupAt) lastBackupAt = new Date(doc.lastBackupAt);
   if (doc) {
     settings = {
       backupSchedule: doc.backupSchedule,
