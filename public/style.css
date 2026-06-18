@@ -3,11 +3,15 @@
 body {
   margin: 0;
   display: flex;
+  flex-direction: column;
   height: 100vh;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: #1f2430;
   background: #f7f8fa;
 }
+
+/* The sidebar + main row sits above the news ticker footer. */
+#app { flex: 1; display: flex; min-height: 0; }
 
 #sidebar {
   width: 320px;
@@ -183,6 +187,9 @@ header h2 { margin: 0; font-size: 20px; }
 .setting { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f0f2f5; }
 .setting span { font-size: 14px; }
 .setting select { padding: 6px 8px; border: 1px solid #d6dae1; border-radius: 8px; font-size: 13px; }
+.setting input[type="email"], .setting input[type="number"] { padding: 6px 8px; border: 1px solid #d6dae1; border-radius: 8px; font-size: 13px; }
+.setting input[type="number"] { width: 72px; }
+.setting input[type="email"] { width: 200px; }
 
 .settings-actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
 .settings-actions #settingsStatus { font-size: 12px; color: #8a91a0; }
@@ -206,3 +213,50 @@ main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding
   border: 1px solid #d0d7de; padding: 6px 12px;
 }
 .editor-preview th, .editor-preview-side th { background: #f6f8fa; }
+
+/* --- news ticker ---------------------------------------------------------- */
+#ticker {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 36px;
+  border-top: 1px solid #e2e5ea;
+  background: #fff;
+  font-size: 13px;
+}
+#ticker[hidden] { display: none; }
+.ticker-label {
+  flex-shrink: 0;
+  padding: 0 12px;
+  border-right: 1px solid #e2e5ea;
+  line-height: 36px;
+  background: #f7f8fa;
+}
+/* Clips the moving track and hides the off-screen headlines. */
+.ticker-viewport { flex: 1; overflow: hidden; }
+.ticker-track {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  will-change: transform;
+  animation: ticker-scroll linear infinite;
+}
+/* Pause so a headline can be read/clicked. */
+#ticker:hover .ticker-track { animation-play-state: paused; }
+/* The track holds two copies of the headlines; translating by -50% loops
+   seamlessly back to the start. Duration is set in JS for a steady speed. */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker-item { color: #1f2430; text-decoration: none; padding: 0 18px; }
+.ticker-item:hover { text-decoration: underline; }
+.ticker-item .src {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: #2f6fed;
+  margin-right: 7px;
+}
+.ticker-track .sep { color: #c4c9d2; }

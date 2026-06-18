@@ -459,6 +459,59 @@ emailBtn.addEventListener('click', async () => {
   }
 });
 
+// --- news ticker ----------------------------------------------------------
+const ticker = document.getElementById('ticker');
+const tickerTrack = document.getElementById('tickerTrack');
+const TICKER_POLL_MS = 5 * 60 * 1000; // refetch headlines every 5 min
+
+// Build one copy of the headlines (items + bullet separators) as DOM nodes.
+// Using textContent (not innerHTML) keeps feed titles safe from HTML injection.
+function buildTickerCopy(items) {
+  const frag = document.createDocumentFragment();
+  for (const it of items) {
+    const a = document.createElement('a');
+    a.className = 'ticker-item';
+    a.href = it.link || '#';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    const src = document.createElement('span');
+    src.className = 'src';
+    src.textContent = it.source;
+    a.appendChild(src);
+    a.appendChild(document.createTextNode(it.title));
+    frag.appendChild(a);
+    const sep = document.createElement('span');
+    sep.className = 'sep';
+    sep.textContent = '•';
+    frag.appendChild(sep);
+  }
+  return frag;
+}
+
+function renderTicker(items) {
+  tickerTrack.innerHTML = '';
+  if (!items.length) { ticker.hidden = true; return; }
+  // Two copies back-to-back so the -50% scroll loops seamlessly.
+  tickerTrack.appendChild(buildTickerCopy(items));
+  tickerTrack.appendChild(buildTickerCopy(items));
+  ticker.hidden = false;
+  // Set a steady speed (~70 px/s) regardless of how many/long the headlines are.
+  requestAnimationFrame(() => {
+    const oneCopy = tickerTrack.scrollWidth / 2;
+    tickerTrack.style.animationDuration = Math.max(20, Math.round(oneCopy / 70)) + 's';
+  });
+}
+
+async function refreshTicker() {
+  try {
+    const res = await fetch('/api/news');
+    const data = await res.json();
+    renderTicker(data.items || []);
+  } catch (e) {
+    // Leave whatever's currently scrolling; try again next poll.
+  }
+}
+
 // --- settings -------------------------------------------------------------
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsOverlay = document.getElementById('settingsOverlay');
@@ -466,6 +519,7 @@ const setDefaultModel = document.getElementById('setDefaultModel');
 const setBackupSchedule = document.getElementById('setBackupSchedule');
 const setBackupHour = document.getElementById('setBackupHour');
 const setEmailTo = document.getElementById('setEmailTo');
+const setNewsCount = document.getElementById('setNewsCount');
 const settingsStatus = document.getElementById('settingsStatus');
 
 // Populate the hour dropdown once (00:00 – 23:00).
@@ -491,6 +545,7 @@ settingsBtn.addEventListener('click', async () => {
   setBackupSchedule.checked = s.backupSchedule === 'on';
   setBackupHour.value = s.backupHour;
   setEmailTo.value = s.emailTo || '';
+  setNewsCount.value = s.newsCount != null ? s.newsCount : 3;
   settingsOverlay.hidden = false;
 });
 
@@ -504,6 +559,7 @@ document.getElementById('saveSettings').addEventListener('click', async () => {
       backupSchedule: setBackupSchedule.checked ? 'on' : 'off',
       backupHour: Number(setBackupHour.value),
       emailTo: setEmailTo.value.trim(),
+      newsCount: Number(setNewsCount.value),
     }),
   });
   if (!res.ok) {
@@ -515,6 +571,8 @@ document.getElementById('saveSettings').addEventListener('click', async () => {
   settingsStatus.textContent = 'saved ✓';
   // Keep the Email button's prefill in sync with the saved default.
   emailConfig.defaultTo = s.emailTo || '';
+  // Apply a changed headline count to the ticker immediately.
+  refreshTicker();
   // Reflect the new default model in the header dropdown selection.
   if ([...modelSelect.options].some((o) => o.value === s.defaultModel)) {
     modelSelect.value = s.defaultModel;
@@ -540,4 +598,6 @@ datePicker.addEventListener('change', () => {
   await refreshNoteList();
   await refreshRefList();
   await loadDate(currentDate);
+  refreshTicker();
+  setInterval(refreshTicker, TICKER_POLL_MS);
 })();

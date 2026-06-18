@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+  <div id="app">
   <aside id="sidebar">
     <h1>📓 Daily Notes</h1>
 
@@ -75,6 +76,11 @@
           <input type="email" id="setEmailTo" placeholder="you@example.com" />
         </label>
 
+        <label class="setting">
+          <span>Headlines per source</span>
+          <input type="number" id="setNewsCount" min="1" max="20" step="1" />
+        </label>
+
         <div class="settings-actions">
           <button id="backupNowBtn">⬇ Back up now</button>
           <span id="settingsStatus"></span>
@@ -99,6 +105,12 @@
     </div>
     <textarea id="editor"></textarea>
   </main>
+  </div>
+
+  <footer id="ticker" hidden title="Latest headlines — click to open; hover to pause">
+    <span class="ticker-label">📰</span>
+    <div class="ticker-viewport"><div class="ticker-track" id="tickerTrack"></div></div>
+  </footer>
 
   <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
   <!-- Pin to match the backend (package.json) and because newer majors dropped

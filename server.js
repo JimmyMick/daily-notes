@@ -5,6 +5,7 @@ const express = require('express');
 const { MongoClient } = require('mongodb');
 const { runBackup } = require('./backup');
 const email = require('./email');
+const news = require('./news');
 
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
@@ -33,6 +34,7 @@ let settings = {
   backupHour: BACKUP_HOUR, // 0-23
   defaultModel: OLLAMA_MODEL,
   emailTo: process.env.GMAIL_USER || '', // default recipient for "Email note"
+  newsCount: parseInt(process.env.NEWS_COUNT || '3', 10) || 3, // headlines per source in the ticker
 };
 
 // Loose email check — enough to catch typos, not RFC-perfect.
@@ -102,6 +104,11 @@ app.put('/api/settings', async (req, res, next) => {
       if (v && !EMAIL_RE.test(v)) return res.status(400).json({ error: 'emailTo must be a valid email' });
       next_.emailTo = v;
     }
+    if (req.body.newsCount !== undefined) {
+      const c = parseInt(req.body.newsCount, 10);
+      if (Number.isNaN(c) || c < 1 || c > 20) return res.status(400).json({ error: 'newsCount must be 1-20' });
+      next_.newsCount = c;
+    }
     settings = next_;
     await settingsCol.updateOne({ _id: 'app' }, { $set: settings }, { upsert: true });
     rescheduleBackup(); // apply schedule changes immediately
@@ -118,6 +125,18 @@ app.post('/api/backup', async (req, res, next) => {
     res.json({ ok: true, count });
   } catch (err) {
     next(err);
+  }
+});
+
+// Latest headlines for the bottom ticker, limited to settings.newsCount per
+// source. Served from a short-lived in-memory cache (see news.js).
+app.get('/api/news', async (req, res) => {
+  try {
+    const data = await news.getHeadlines(settings.newsCount);
+    res.json(data);
+  } catch (err) {
+    console.error('[news] route failed:', err.message);
+    res.json({ items: [], fetchedAt: 0 });
   }
 });
 
@@ -446,6 +465,7 @@ async function loadSettings() {
       backupHour: doc.backupHour,
       defaultModel: doc.defaultModel,
       emailTo: doc.emailTo || settings.emailTo || '',
+      newsCount: doc.newsCount || settings.newsCount || 3,
     };
   } else {
     await settingsCol.insertOne({ _id: 'app', ...settings });

@@ -15,6 +15,7 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 - **Summarize** a note with a local **Ollama** model (✨ button)
 - **Email a note** (daily or reference) via Gmail (✉ button)
 - **Insert a timestamp** anchor with the 🕒 toolbar button (time-tag diary entries)
+- **News ticker** — scrolling headlines from NPR, NRK, and ESPN along the bottom
 - Autosave as you type (debounced)
 - A sidebar list of every day that has a note
 
@@ -87,6 +88,19 @@ nothing. Mail is sent **from** `GMAIL_USER`. Set a default recipient in the
 **Settings** panel (it defaults to your own address, so you can mail notes to
 yourself).
 
+## News ticker
+
+A scrolling **headline ticker** runs along the bottom of the window, pulling the
+latest stories from **NPR**, **NRK** (Norwegian), and **ESPN**. Each headline is
+clickable (opens the article in a new tab), and hovering the ticker pauses it so
+you can read or click.
+
+- Headlines refresh every 5 minutes; the server caches feeds (5-min TTL) so
+  client polling doesn't hammer the sources.
+- **Headlines per source** is configurable in **Settings** (1–20, default **3**).
+- NPR and NRK come from their RSS feeds; ESPN's RSS is defunct, so its headlines
+  come from ESPN's JSON "now" news API instead. Sources are defined in `news.js`.
+
 ## Run it
 
 ```bash
@@ -140,6 +154,7 @@ Click **⚙** in the header for an in-app Settings panel:
 - **Backup time** — hour of day (local time)
 - **Back up now** — run a backup immediately
 - **Email notes to** — default recipient for the ✉ button
+- **Headlines per source** — how many headlines each news source contributes to the ticker (1–20)
 
 Settings persist in MongoDB (a `settings` collection) and the env vars below
 just seed the first-run defaults. The backup *folder* is the Docker volume
@@ -188,6 +203,7 @@ Collection `references` (one per named, evergreen note):
 | `POST` | `/api/summarize` | Summarize content via Ollama (`{ "content": "…", "model"?: "…" }`) |
 | `GET` | `/api/email/status` | Whether Gmail is configured + the default recipient |
 | `POST` | `/api/email` | Email a note (`{ "kind": "daily"\|"reference", "id": "…", "to": "…" }`) |
+| `GET` | `/api/news` | Latest ticker headlines (NPR/NRK/ESPN), limited per source |
 | `GET` | `/api/references` | List reference notes (alphabetical by title) |
 | `POST` | `/api/references` | Create a reference note (`{ "title": "…" }`), returns its `slug` |
 | `GET` | `/api/references/:slug` | Fetch a reference note |
@@ -210,6 +226,7 @@ Collection `references` (one per named, evergreen note):
 | `GMAIL_APP_PASSWORD` | _(unset)_ | Gmail [App Password](https://myaccount.google.com/apppasswords) (spaces stripped) |
 | `SMTP_HOST` | `smtp.gmail.com` | SMTP host (override only for non-Gmail SMTP) |
 | `SMTP_PORT` | `465` | SMTP port (`465` implicit TLS, `587` STARTTLS) |
+| `NEWS_COUNT` | `3` | Seeds the headlines-per-source default for the ticker (1–20) |
 
 Env vars seed first-run defaults; the Settings panel persists overrides in
 MongoDB. The Gmail **secret** (`GMAIL_APP_PASSWORD`) lives only in env / `.env`,
