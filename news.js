@@ -1,76 +1,90 @@
 'use strict';
 
-// Fetches latest headlines for the ticker. NPR and NRK publish normal RSS;
-// ESPN's RSS is defunct, so we use their JSON "now" headlines API instead.
-// Results are cached in memory (all sources refreshed together) so client
-// polling doesn't hammer the feeds; the per-source count is applied per request.
+// Fetches latest headlines for the ticker from a configurable list of sources.
+// Most sources are standard RSS/Atom feeds (handled generically by rss-parser);
+// ESPN's RSS is defunct, so its JSON "now" headlines API is detected by URL and
+// parsed specially. Each feed is cached on its own (keyed by URL) so adding or
+// removing sources just works and client polling doesn't hammer the feeds.
 const Parser = require('rss-parser');
 
 const UA = 'Mozilla/5.0 (compatible; daily-notes/1.0; +https://github.com/)';
 const parser = new Parser({ timeout: 9000, headers: { 'User-Agent': UA } });
 
-// Up to this many items are cached per source; the UI's count slices from these.
-const MAX_PER_SOURCE = 20;
-const TTL_MS = 5 * 60 * 1000; // refresh feeds at most every 5 min
+const MAX_PER_SOURCE = 20; // cap cached items per feed; UI count slices from these
+const TTL_MS = 5 * 60 * 1000; // refetch a given feed at most every 5 min
+const MAX_SOURCES = 12; // bound the fan-out of a single /api/news call
 
-const SOURCES = [
-  { name: 'NPR', kind: 'rss', url: 'https://feeds.npr.org/1001/rss.xml' },
-  { name: 'NRK', kind: 'rss', url: 'https://www.nrk.no/toppsaker.rss' },
-  { name: 'ESPN', kind: 'espn', url: 'https://now.core.api.espn.com/v1/sports/news?limit=20' },
+// Seeds the source list on first run; fully editable in Settings afterward.
+const DEFAULT_SOURCES = [
+  { name: 'NPR', url: 'https://feeds.npr.org/1001/rss.xml' },
+  { name: 'NRK', url: 'https://www.nrk.no/toppsaker.rss' },
+  { name: 'ESPN', url: 'https://now.core.api.espn.com/v1/sports/news?limit=20' },
 ];
 
-let cache = { at: 0, bySource: {} };
+// ESPN's headlines come from a JSON API, not RSS — detect it by host.
+function isEspnJson(url) {
+  return /(^|\.)now\.core\.api\.espn\.com$/i.test(safeHost(url));
+}
+
+function safeHost(url) {
+  try { return new URL(url).host; } catch { return ''; }
+}
 
 async function fetchRss(url) {
   const feed = await parser.parseURL(url);
-  return (feed.items || [])
+  const items = (feed.items || [])
     .map((i) => ({ title: (i.title || '').trim(), link: i.link || '' }))
     .filter((i) => i.title);
+  return { items, feedTitle: (feed.title || '').trim() };
 }
 
-async function fetchEspn(url) {
+async function fetchEspnJson(url) {
   const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(9000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  return (data.headlines || [])
+  const items = (data.headlines || [])
     .map((h) => ({
       title: (h.headline || '').trim(),
       link: (h.links && h.links.web && h.links.web.href) || '',
     }))
     .filter((i) => i.title);
+  return { items, feedTitle: 'ESPN' };
 }
 
-// Refresh every source. A source that fails keeps its previously cached items
-// (graceful degradation) rather than vanishing from the ticker.
-async function refresh() {
-  const prev = cache.bySource || {};
-  const bySource = {};
-  await Promise.all(
-    SOURCES.map(async (src) => {
-      try {
-        const items = src.kind === 'espn' ? await fetchEspn(src.url) : await fetchRss(src.url);
-        bySource[src.name] = items.slice(0, MAX_PER_SOURCE);
-      } catch (e) {
-        console.error(`[news] ${src.name} fetch failed: ${e.message}`);
-        bySource[src.name] = prev[src.name] || [];
-      }
-    })
-  );
-  cache = { at: Date.now(), bySource };
+// Per-URL cache. A failed refresh keeps the last-good items so a flaky feed
+// degrades gracefully instead of vanishing from the ticker.
+const cache = new Map(); // url -> { at, items, name }
+
+async function getForSource(src) {
+  const cached = cache.get(src.url);
+  if (cached && Date.now() - cached.at < TTL_MS) return cached;
+  try {
+    const { items, feedTitle } = isEspnJson(src.url) ? await fetchEspnJson(src.url) : await fetchRss(src.url);
+    // Prefer the user-given name; else the feed's own title; else the hostname.
+    const name = src.name || feedTitle || safeHost(src.url) || 'news';
+    const entry = { at: Date.now(), items: items.slice(0, MAX_PER_SOURCE), name };
+    cache.set(src.url, entry);
+    return entry;
+  } catch (e) {
+    console.error(`[news] ${src.name || src.url} fetch failed: ${e.message}`);
+    if (cached) return cached; // serve stale rather than dropping the source
+    return { at: Date.now(), items: [], name: src.name || safeHost(src.url) || 'news' };
+  }
 }
 
-// Return up to `perSource` headlines from each source, in SOURCES order.
-// Refreshes the cache first if it's stale or empty.
-async function getHeadlines(perSource) {
+// Return up to `perSource` headlines from each configured source, in order.
+// `sources` is [{ name, url }]; falls back to the defaults if none given.
+async function getHeadlines(perSource, sources) {
   const n = Math.max(1, Math.min(MAX_PER_SOURCE, parseInt(perSource, 10) || 3));
-  if (!cache.at || Date.now() - cache.at > TTL_MS) await refresh();
+  const list = (Array.isArray(sources) && sources.length ? sources : DEFAULT_SOURCES).slice(0, MAX_SOURCES);
+  const entries = await Promise.all(list.map(getForSource));
   const items = [];
-  for (const src of SOURCES) {
-    for (const it of (cache.bySource[src.name] || []).slice(0, n)) {
-      items.push({ source: src.name, title: it.title, link: it.link });
+  for (const entry of entries) {
+    for (const it of entry.items.slice(0, n)) {
+      items.push({ source: entry.name, title: it.title, link: it.link });
     }
   }
-  return { items, fetchedAt: cache.at };
+  return { items, fetchedAt: Date.now() };
 }
 
-module.exports = { getHeadlines, sources: SOURCES.map((s) => s.name) };
+module.exports = { getHeadlines, DEFAULT_SOURCES, MAX_SOURCES };

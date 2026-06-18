@@ -90,16 +90,29 @@ yourself).
 
 ## News ticker
 
-A scrolling **headline ticker** runs along the bottom of the window, pulling the
-latest stories from **NPR**, **NRK** (Norwegian), and **ESPN**. Each headline is
-clickable (opens the article in a new tab), and hovering the ticker pauses it so
-you can read or click.
+A scrolling **headline ticker** runs along the bottom of the window. It ships
+with **NPR**, **NRK** (Norwegian), and **ESPN**, but the source list is fully
+editable. Each headline is clickable (opens the article in a new tab), and
+hovering the ticker pauses it so you can read or click.
 
-- Headlines refresh every 5 minutes; the server caches feeds (5-min TTL) so
+- Headlines refresh every 5 minutes; the server caches each feed (5-min TTL) so
   client polling doesn't hammer the sources.
 - **Headlines per source** is configurable in **Settings** (1–20, default **3**).
-- NPR and NRK come from their RSS feeds; ESPN's RSS is defunct, so its headlines
-  come from ESPN's JSON "now" news API instead. Sources are defined in `news.js`.
+- **News sources** is an editable list in **Settings** — one per line as
+  `Name | https://feed-url` (the name is optional; a bare URL works and the name
+  is derived from the feed's own title or hostname). Up to 12 sources.
+
+### Adding your own sources
+
+Almost any news site publishes a standard **RSS or Atom** feed, and those work
+out of the box — just paste the feed URL. Examples: BBC
+(`https://feeds.bbci.co.uk/news/world/rss.xml`), The Guardian
+(`https://www.theguardian.com/world/rss`), Hacker News
+(`https://hnrss.org/frontpage`).
+
+The one exception is **ESPN**, whose RSS is defunct — its headlines come from
+ESPN's JSON "now" news API, which `news.js` recognizes by URL. Other proprietary
+JSON APIs won't parse; stick to RSS/Atom feeds for anything you add.
 
 ## Run it
 
@@ -155,6 +168,7 @@ Click **⚙** in the header for an in-app Settings panel:
 - **Back up now** — run a backup immediately
 - **Email notes to** — default recipient for the ✉ button
 - **Headlines per source** — how many headlines each news source contributes to the ticker (1–20)
+- **News sources** — the editable feed list (`Name | URL` per line, RSS/Atom)
 
 Settings persist in MongoDB (a `settings` collection) and the env vars below
 just seed the first-run defaults. The backup *folder* is the Docker volume

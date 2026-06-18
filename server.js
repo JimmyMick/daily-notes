@@ -35,7 +35,21 @@ let settings = {
   defaultModel: OLLAMA_MODEL,
   emailTo: process.env.GMAIL_USER || '', // default recipient for "Email note"
   newsCount: parseInt(process.env.NEWS_COUNT || '3', 10) || 3, // headlines per source in the ticker
+  newsSources: news.DEFAULT_SOURCES, // [{ name, url }] feeds for the ticker
 };
+
+// Validate/normalize a user-supplied news-source list. Each entry needs an
+// http(s) URL; the name is optional (news.js derives one from the feed/host).
+function cleanNewsSources(input) {
+  if (!Array.isArray(input)) return null;
+  const out = [];
+  for (const s of input.slice(0, news.MAX_SOURCES)) {
+    const url = typeof s.url === 'string' ? s.url.trim() : '';
+    if (!/^https?:\/\/\S+$/i.test(url)) return null;
+    out.push({ name: typeof s.name === 'string' ? s.name.trim() : '', url });
+  }
+  return out;
+}
 
 // Loose email check — enough to catch typos, not RFC-perfect.
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -109,6 +123,11 @@ app.put('/api/settings', async (req, res, next) => {
       if (Number.isNaN(c) || c < 1 || c > 20) return res.status(400).json({ error: 'newsCount must be 1-20' });
       next_.newsCount = c;
     }
+    if (req.body.newsSources !== undefined) {
+      const sources = cleanNewsSources(req.body.newsSources);
+      if (!sources) return res.status(400).json({ error: 'each news source needs a valid http(s) URL' });
+      next_.newsSources = sources;
+    }
     settings = next_;
     await settingsCol.updateOne({ _id: 'app' }, { $set: settings }, { upsert: true });
     rescheduleBackup(); // apply schedule changes immediately
@@ -132,7 +151,7 @@ app.post('/api/backup', async (req, res, next) => {
 // source. Served from a short-lived in-memory cache (see news.js).
 app.get('/api/news', async (req, res) => {
   try {
-    const data = await news.getHeadlines(settings.newsCount);
+    const data = await news.getHeadlines(settings.newsCount, settings.newsSources);
     res.json(data);
   } catch (err) {
     console.error('[news] route failed:', err.message);
@@ -466,6 +485,7 @@ async function loadSettings() {
       defaultModel: doc.defaultModel,
       emailTo: doc.emailTo || settings.emailTo || '',
       newsCount: doc.newsCount || settings.newsCount || 3,
+      newsSources: Array.isArray(doc.newsSources) && doc.newsSources.length ? doc.newsSources : news.DEFAULT_SOURCES,
     };
   } else {
     await settingsCol.insertOne({ _id: 'app', ...settings });

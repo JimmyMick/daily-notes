@@ -520,7 +520,26 @@ const setBackupSchedule = document.getElementById('setBackupSchedule');
 const setBackupHour = document.getElementById('setBackupHour');
 const setEmailTo = document.getElementById('setEmailTo');
 const setNewsCount = document.getElementById('setNewsCount');
+const setNewsSources = document.getElementById('setNewsSources');
 const settingsStatus = document.getElementById('settingsStatus');
+
+// Sources <-> textarea. Each line is "Name | URL" (name optional: a bare URL is
+// fine and the server derives a name from the feed/host). Blank and #-comment
+// lines are ignored.
+function sourcesToText(sources) {
+  return (sources || []).map((s) => (s.name ? `${s.name} | ${s.url}` : s.url)).join('\n');
+}
+function textToSources(text) {
+  return text.split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line) => {
+      const i = line.indexOf('|');
+      if (i === -1) return { name: '', url: line };
+      return { name: line.slice(0, i).trim(), url: line.slice(i + 1).trim() };
+    })
+    .filter((s) => s.url);
+}
 
 // Populate the hour dropdown once (00:00 – 23:00).
 for (let h = 0; h < 24; h++) {
@@ -546,6 +565,7 @@ settingsBtn.addEventListener('click', async () => {
   setBackupHour.value = s.backupHour;
   setEmailTo.value = s.emailTo || '';
   setNewsCount.value = s.newsCount != null ? s.newsCount : 3;
+  setNewsSources.value = sourcesToText(s.newsSources);
   settingsOverlay.hidden = false;
 });
 
@@ -560,6 +580,7 @@ document.getElementById('saveSettings').addEventListener('click', async () => {
       backupHour: Number(setBackupHour.value),
       emailTo: setEmailTo.value.trim(),
       newsCount: Number(setNewsCount.value),
+      newsSources: textToSources(setNewsSources.value),
     }),
   });
   if (!res.ok) {

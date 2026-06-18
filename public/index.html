@@ -81,6 +81,12 @@
           <input type="number" id="setNewsCount" min="1" max="20" step="1" />
         </label>
 
+        <label class="setting setting-col">
+          <span>News sources <small>one per line — <code>Name | https://feed-url</code> (RSS/Atom)</small></span>
+          <textarea id="setNewsSources" rows="4" spellcheck="false"
+            placeholder="NPR | https://feeds.npr.org/1001/rss.xml"></textarea>
+        </label>
+
         <div class="settings-actions">
           <button id="backupNowBtn">⬇ Back up now</button>
           <span id="settingsStatus"></span>
