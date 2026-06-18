@@ -19,6 +19,25 @@ let currentRef = null; // { slug, title } when mode === 'reference'
 // and options as the email renderer, so preview and email stay consistent.
 if (window.marked) marked.setOptions({ gfm: true });
 
+// Toolbar button: drop the current local time into the note as a bold anchor
+// (e.g. "**3:42 PM** "). Handy for time-tagging diary entries — especially in
+// reference notes, which aren't dated. Inserts on its own line so it reads as a
+// marker; leaves the cursor right after it to keep typing.
+const timestampButton = {
+  name: 'timestamp',
+  title: 'Insert current time',
+  text: '🕒',
+  action: (ed) => {
+    const cm = ed.codemirror;
+    const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const cur = cm.getCursor();
+    // Start on a fresh line unless we're already at the start of an empty line.
+    const atLineStart = cur.ch === 0 && !cm.getLine(cur.line);
+    cm.replaceSelection(`${atLineStart ? '' : '\n'}**${time}** `);
+    cm.focus();
+  },
+};
+
 const editor = new EasyMDE({
   element: document.getElementById('editor'),
   spellChecker: false,
@@ -27,7 +46,7 @@ const editor = new EasyMDE({
   placeholder: 'Write today\'s notes in markdown…',
   previewRender: (plainText) => (window.marked ? marked.parse(plainText) : plainText),
   toolbar: ['bold', 'italic', 'heading', '|', 'unordered-list', 'ordered-list',
-    'code', 'quote', 'table', '|', 'link', 'preview', 'side-by-side', 'fullscreen'],
+    'code', 'quote', 'table', timestampButton, '|', 'link', 'preview', 'side-by-side', 'fullscreen'],
 });
 
 const datePicker = document.getElementById('datePicker');

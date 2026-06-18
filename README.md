@@ -14,6 +14,7 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 - **Search** across all note content (MongoDB text index)
 - **Summarize** a note with a local **Ollama** model (✨ button)
 - **Email a note** (daily or reference) via Gmail (✉ button)
+- **Insert a timestamp** anchor with the 🕒 toolbar button (time-tag diary entries)
 - Autosave as you type (debounced)
 - A sidebar list of every day that has a note
 
