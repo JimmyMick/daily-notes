@@ -151,7 +151,15 @@ async function loadDate(date) {
   } finally {
     loading = false;
   }
-  highlightActive();
+  // If we jumped into a collapsed month (date picker / search), open it so the
+  // active day is visible; re-render only when it was actually closed.
+  const mk = monthKey(date);
+  if (!expandedMonths.has(mk)) {
+    expandedMonths.add(mk);
+    await refreshNoteList();
+  } else {
+    highlightActive();
+  }
 }
 
 let currentArchived = false;
@@ -169,26 +177,72 @@ function formatHeading(date) {
   return dt.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-// --- sidebar: all notes ---------------------------------------------------
+// --- sidebar: all notes (grouped by month) --------------------------------
+// Daily notes are grouped under collapsible "Month YYYY" headers so the list
+// stays navigable as the journal grows. Which months are open is tracked here,
+// seeded once with the current date's month; the rest start collapsed.
+const expandedMonths = new Set();
+let monthsInitialized = false;
+
+function monthKey(date) { return date.slice(0, 7); } // "2026-06"
+function monthLabel(key) {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+function toggleMonth(key) {
+  if (expandedMonths.has(key)) expandedMonths.delete(key);
+  else expandedMonths.add(key);
+  refreshNoteList(); // re-render with the new open/closed state
+}
+
 async function refreshNoteList() {
   const archived = showArchived.checked;
   const res = await fetch(`/api/notes?archived=${archived}`);
   const docs = await res.json();
   notesHeading.textContent = archived ? 'Archived notes' : 'All notes';
+  if (!monthsInitialized) { expandedMonths.add(monthKey(currentDate)); monthsInitialized = true; }
   noteList.innerHTML = '';
   if (!docs.length) {
     const li = document.createElement('li');
     li.textContent = archived ? 'No archived notes' : 'No notes yet';
-    li.style.color = '#8a91a0';
-    li.style.cursor = 'default';
+    li.className = 'empty';
     noteList.appendChild(li);
+    return;
   }
+  // Group by year-month, preserving the API's newest-first order.
+  const groups = [];
+  const byKey = new Map();
   for (const doc of docs) {
-    const li = document.createElement('li');
-    li.textContent = doc.date;
-    li.dataset.date = doc.date;
-    li.onclick = () => loadDate(doc.date);
-    noteList.appendChild(li);
+    const key = monthKey(doc.date);
+    let g = byKey.get(key);
+    if (!g) { g = { key, docs: [] }; byKey.set(key, g); groups.push(g); }
+    g.docs.push(doc);
+  }
+  for (const g of groups) {
+    const expanded = expandedMonths.has(g.key);
+    const groupLi = document.createElement('li');
+    groupLi.className = 'month-group' + (expanded ? '' : ' collapsed');
+
+    const header = document.createElement('div');
+    header.className = 'month-header';
+    header.innerHTML = '<span class="caret">▾</span><span class="month-name"></span><span class="month-count"></span>';
+    header.querySelector('.month-name').textContent = monthLabel(g.key);
+    header.querySelector('.month-count').textContent = g.docs.length;
+    header.onclick = () => toggleMonth(g.key);
+    groupLi.appendChild(header);
+
+    const sub = document.createElement('ul');
+    sub.className = 'month-notes';
+    for (const doc of g.docs) {
+      const li = document.createElement('li');
+      li.textContent = doc.date;
+      li.dataset.date = doc.date;
+      li.onclick = () => loadDate(doc.date);
+      sub.appendChild(li);
+    }
+    groupLi.appendChild(sub);
+    noteList.appendChild(groupLi);
   }
   highlightActive();
 }
@@ -215,12 +269,13 @@ archiveBtn.addEventListener('click', async () => {
 });
 
 function highlightActive() {
-  for (const li of noteList.children) {
+  // Date items are now nested inside month groups, so query them by attribute.
+  noteList.querySelectorAll('li[data-date]').forEach((li) => {
     li.classList.toggle('active', mode === 'daily' && li.dataset.date === currentDate);
-  }
-  for (const li of refList.children) {
+  });
+  refList.querySelectorAll('li[data-slug]').forEach((li) => {
     li.classList.toggle('active', mode === 'reference' && currentRef && li.dataset.slug === currentRef.slug);
-  }
+  });
 }
 
 // --- reference notes ------------------------------------------------------

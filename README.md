@@ -19,7 +19,7 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 - **News ticker** — scrolling headlines from NPR, BBC, NRK, and ESPN along the bottom
 - **Scores ticker** — a second line with live/final sports scores (ESPN)
 - Autosave as you type (debounced)
-- A sidebar list of every day that has a note
+- A sidebar list of every day that has a note, **grouped by month** (collapsible)
 
 ## Summarize with Ollama
 
