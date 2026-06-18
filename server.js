@@ -190,6 +190,23 @@ app.post('/api/images', upload.single('image'), async (req, res, next) => {
   }
 });
 
+// Collect the uploaded images a note references (by /api/images/<id>), so the
+// emailer can inline them. Returns { id: { contentType, buffer } }.
+async function collectNoteImages(markdown) {
+  const ids = new Set();
+  const re = /\/api\/images\/([0-9a-fA-F]{24})/g;
+  let m;
+  while ((m = re.exec(markdown || ''))) ids.add(m[1]);
+  const map = {};
+  for (const id of ids) {
+    try {
+      const doc = await images.findOne({ _id: new ObjectId(id) });
+      if (doc && doc.data) map[id] = { contentType: doc.contentType, buffer: doc.data.buffer };
+    } catch { /* skip bad id */ }
+  }
+  return map;
+}
+
 // Serve an uploaded image by id.
 app.get('/api/images/:id', async (req, res, next) => {
   try {
@@ -269,7 +286,8 @@ app.post('/api/email', async (req, res, next) => {
     }
 
     try {
-      await email.sendNoteEmail({ to: recipients.join(', '), subject, markdown });
+      const noteImages = await collectNoteImages(markdown);
+      await email.sendNoteEmail({ to: recipients.join(', '), subject, markdown, images: noteImages });
     } catch (err) {
       // Surface SMTP/auth failures clearly instead of the generic 500 handler.
       return res.status(502).json({ error: 'send failed', detail: err.message });

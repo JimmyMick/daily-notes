@@ -46,7 +46,12 @@ const TABLE_STYLE = 'border-collapse:collapse;margin:1em 0;font-size:14px';
 const CELL_STYLE = 'border:1px solid #d0d7de;padding:6px 12px';
 const TH_STYLE = CELL_STYLE + ';background:#f6f8fa;font-weight:600';
 
-function mdToHtml(md) {
+// Render markdown to the styled email HTML. `images` maps an image id to
+// { contentType, buffer }; any `<img src="/api/images/<id>">` whose id is in the
+// map is rewritten to a `cid:` reference and returned as an inline attachment,
+// so the picture renders in the recipient's inbox (the server URL wouldn't be
+// reachable from there). Returns { html, attachments }.
+function renderEmail(md, images) {
   let body = marked.parse(String(md || ''));
   // Inject inline styles. marked may emit `<th align="center">`, so match the
   // tag name followed by a space or `>` and insert the style attribute first.
@@ -55,7 +60,24 @@ function mdToHtml(md) {
     .replace(/<th(\s|>)/g, `<th style="${TH_STYLE}"$1`)
     .replace(/<td(\s|>)/g, `<td style="${CELL_STYLE}"$1`);
 
-  return `<!DOCTYPE html>
+  const attachments = [];
+  body = body.replace(/src="\/api\/images\/([0-9a-fA-F]{24})"/g, (full, id) => {
+    const img = images && images[id];
+    if (!img) return full; // unknown/deleted image — leave the URL as-is
+    const cid = `img-${id}`;
+    if (!attachments.some((a) => a.cid === cid)) {
+      attachments.push({
+        filename: id,
+        content: img.buffer,
+        contentType: img.contentType || 'application/octet-stream',
+        cid,
+        contentDisposition: 'inline',
+      });
+    }
+    return `src="cid:${cid}"`;
+  });
+
+  const html = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8" />
@@ -79,17 +101,20 @@ function mdToHtml(md) {
 </head>
 <body><div class="note-body">${body}</div></body>
 </html>`;
+  return { html, attachments };
 }
 
 // Send one note. `to` may be a comma-separated list (nodemailer accepts that).
-async function sendNoteEmail({ to, subject, markdown }) {
-  const t = getTransporter();
-  const info = await t.sendMail({
+// `images` (optional) maps image id -> { contentType, buffer } for inlining.
+async function sendNoteEmail({ to, subject, markdown, images }) {
+  const { html, attachments } = renderEmail(markdown, images || {});
+  const info = await getTransporter().sendMail({
     from: GMAIL_USER,
     to,
     subject,
     text: markdown,
-    html: mdToHtml(markdown),
+    html,
+    attachments,
   });
   return info.messageId;
 }
