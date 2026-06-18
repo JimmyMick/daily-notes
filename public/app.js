@@ -467,6 +467,16 @@ const scoresTrack = document.getElementById('scoresTrack');
 const NEWS_POLL_MS = 5 * 60 * 1000; // headlines change slowly
 const SCORES_POLL_MS = 60 * 1000; // scores change fast
 
+// The tickers are position:fixed at the bottom, so reserve matching space on
+// the app area to keep content from hiding behind them. The footer height
+// changes as rows show/hide, so track it and keep the padding in sync.
+const tickersEl = document.getElementById('tickers');
+const appEl = document.getElementById('app');
+function reserveTickerSpace() {
+  appEl.style.paddingBottom = tickersEl.offsetHeight + 'px';
+}
+new ResizeObserver(reserveTickerSpace).observe(tickersEl);
+
 // Build one copy of a ticker's items (tag + text + bullet separators) as DOM
 // nodes. textContent (not innerHTML) keeps feed/score text safe from injection.
 // Each item: { tag, text, link, live? }.

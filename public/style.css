@@ -230,7 +230,15 @@ main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding
 .editor-preview th, .editor-preview-side th { background: #f6f8fa; }
 
 /* --- ticker rows (news + scores) ------------------------------------------ */
-#tickers { flex-shrink: 0; }
+/* Pinned to the viewport bottom so the tickers stay put while content scrolls.
+   #app gets a matching padding-bottom (set in JS) so nothing hides behind. */
+#tickers {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+}
 .ticker {
   display: flex;
   align-items: center;
