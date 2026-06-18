@@ -90,7 +90,7 @@ body {
 #searchResults .r-date { font-weight: 600; font-size: 13px; }
 #searchResults .r-snippet { color: #6b7280; font-size: 12px; margin-top: 2px; }
 
-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 
 header {
   display: flex;
@@ -217,8 +217,10 @@ header h2 { margin: 0; font-size: 20px; }
 .settings-note { font-size: 12px; color: #8a91a0; line-height: 1.5; margin: 16px 0 0; }
 .settings-note code { background: #f0f2f5; padding: 1px 4px; border-radius: 4px; }
 
-main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding: 16px 24px; }
-.CodeMirror { flex: 1; border-radius: 8px; }
+/* min-height:0 lets the flex chain shrink to the viewport so the editor scrolls
+   internally instead of autogrowing and pushing the page under the tickers. */
+main .EasyMDEContainer { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px 24px; }
+.CodeMirror { flex: 1; min-height: 0; border-radius: 8px; }
 
 /* Markdown preview: render GFM tables with visible borders (the editor preview
    and the side-by-side pane both use these classes). */

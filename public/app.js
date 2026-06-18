@@ -473,7 +473,8 @@ const SCORES_POLL_MS = 60 * 1000; // scores change fast
 const tickersEl = document.getElementById('tickers');
 const appEl = document.getElementById('app');
 function reserveTickerSpace() {
-  appEl.style.paddingBottom = tickersEl.offsetHeight + 'px';
+  // Footer height + a small gap so the editor's bottom clears the tickers.
+  appEl.style.paddingBottom = tickersEl.offsetHeight + 8 + 'px';
 }
 new ResizeObserver(reserveTickerSpace).observe(tickersEl);
 
