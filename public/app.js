@@ -14,14 +14,20 @@ let loading = false;
 let mode = 'daily'; // 'daily' | 'reference'
 let currentRef = null; // { slug, title } when mode === 'reference'
 
+// Render the preview with `marked` (GFM on) so markdown tables, strikethrough,
+// etc. render — EasyMDE's bundled parser doesn't do GFM tables. Same library
+// and options as the email renderer, so preview and email stay consistent.
+if (window.marked) marked.setOptions({ gfm: true });
+
 const editor = new EasyMDE({
   element: document.getElementById('editor'),
   spellChecker: false,
   autofocus: true,
   status: false,
   placeholder: 'Write today\'s notes in markdown…',
+  previewRender: (plainText) => (window.marked ? marked.parse(plainText) : plainText),
   toolbar: ['bold', 'italic', 'heading', '|', 'unordered-list', 'ordered-list',
-    'code', 'quote', '|', 'link', 'preview', 'side-by-side', 'fullscreen'],
+    'code', 'quote', 'table', '|', 'link', 'preview', 'side-by-side', 'fullscreen'],
 });
 
 const datePicker = document.getElementById('datePicker');

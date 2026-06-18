@@ -197,3 +197,12 @@ header h2 { margin: 0; font-size: 20px; }
 
 main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding: 16px 24px; }
 .CodeMirror { flex: 1; border-radius: 8px; }
+
+/* Markdown preview: render GFM tables with visible borders (the editor preview
+   and the side-by-side pane both use these classes). */
+.editor-preview table, .editor-preview-side table { border-collapse: collapse; margin: 1em 0; }
+.editor-preview th, .editor-preview td,
+.editor-preview-side th, .editor-preview-side td {
+  border: 1px solid #d0d7de; padding: 6px 12px;
+}
+.editor-preview th, .editor-preview-side th { background: #f6f8fa; }

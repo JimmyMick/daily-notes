@@ -3,7 +3,7 @@
 A small, self-hosted app for keeping **one markdown note per day** in the browser, backed by **MongoDB**.
 
 - **Backend:** Node + Express
-- **Editor:** EasyMDE (markdown with live preview), vanilla JS — no frontend build step
+- **Editor:** EasyMDE (markdown with live preview, **GFM tables** via marked), vanilla JS — no frontend build step
 - **Store:** MongoDB (one document per day, full-text search via a text index)
 
 ## Features
@@ -54,9 +54,11 @@ not yet wired into the top search box — that searches daily notes only.
 ## Email a note
 
 The ✉ **Email** button sends the note currently open — daily *or* reference —
-to a recipient via **Gmail**. The note's markdown is sent as the plain-text body
-plus a whitespace-preserving HTML version, so it reads cleanly in any mail
-client. The subject is `Daily note — YYYY-MM-DD` or `Reference note — <title>`.
+to a recipient via **Gmail**. The markdown is **rendered to styled HTML**
+(headings, lists, code, blockquotes, and **tables** — via [marked](https://marked.js.org)),
+with the raw markdown included as the plain-text fallback. Tables get inline
+border styles so they render even in stricter mail clients. The subject is
+`Daily note — YYYY-MM-DD` or `Reference note — <title>`.
 
 Clicking ✉ flushes any pending edit, then prompts for the recipient (prefilled
 with your default — see Settings). You can enter a comma-separated list to send
