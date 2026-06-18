@@ -17,6 +17,7 @@ const MAX_SOURCES = 12; // bound the fan-out of a single /api/news call
 // Seeds the source list on first run; fully editable in Settings afterward.
 const DEFAULT_SOURCES = [
   { name: 'NPR', url: 'https://feeds.npr.org/1001/rss.xml' },
+  { name: 'BBC', url: 'https://feeds.bbci.co.uk/news/rss.xml' },
   { name: 'NRK', url: 'https://www.nrk.no/toppsaker.rss' },
   { name: 'ESPN', url: 'https://now.core.api.espn.com/v1/sports/news?limit=20' },
 ];
