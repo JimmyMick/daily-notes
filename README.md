@@ -103,13 +103,9 @@ markdown image — `![](/api/images/<id>)` — so it renders in the preview and 
 note stays small. Limits: image types only, up to **10 MB** each. Served with a
 long cache lifetime (ids are stable).
 
-> **Notes / current limits**
-> - **Backups:** markdown exports reference images by URL, but the image
->   binaries live in Mongo (the `mongo_data` volume), not in `backups/`. A
->   markdown-only restore keeps the links but not the image data.
-> - **Email:** emailed notes reference images as `/api/images/...` on this
->   server, so they only load where that server is reachable. Embedding images
->   inline in email is a possible follow-up.
+Images are included in [backups](#backup--restore) (under `backups/images/`) and
+embedded inline when a note is [emailed](#email-a-note), so screenshots render in
+the recipient's inbox.
 
 ## News ticker
 
@@ -185,6 +181,11 @@ the dates present in the folder.
 **Reference notes** are backed up alongside daily notes, under
 `backups/references/<slug>.md` (frontmatter: `slug`, `title`, `createdAt`,
 `updatedAt`). `restore` upserts them by `slug`.
+
+**Uploaded images** are backed up under `backups/images/` — each binary as
+`<id>.<ext>` plus an `index.json` carrying their ids and content types. `restore`
+re-imports them upsert-by-id, so the original `![](/api/images/<id>)` links in
+your notes keep resolving after a restore.
 
 A **daily backup runs automatically** while the app is up (default 2am local).
 Configure it in the **Settings** panel (⚙) or via env vars.

@@ -7,7 +7,7 @@
 
 const fs = require('fs/promises');
 const path = require('path');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId, Binary } = require('mongodb');
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
 const DB_NAME = process.env.DB_NAME || 'daily_notes';
@@ -84,7 +84,36 @@ async function main() {
       refRestored++;
     }
 
-    console.log(`Restored ${restored} note(s) and ${refRestored} reference(s) from ${BACKUP_DIR}`);
+    // Restore uploaded images from images/index.json + the binary files, upsert
+    // by their original _id so note links (/api/images/<id>) keep working.
+    const imgDir = path.join(BACKUP_DIR, 'images');
+    let imgIndex = [];
+    try {
+      imgIndex = JSON.parse(await fs.readFile(path.join(imgDir, 'index.json'), 'utf8'));
+    } catch {
+      // no images/index.json — nothing to restore
+    }
+    let imgRestored = 0;
+    if (Array.isArray(imgIndex) && imgIndex.length) {
+      const imagesCol = client.db(DB_NAME).collection('images');
+      for (const e of imgIndex) {
+        let _id;
+        try { _id = new ObjectId(e.id); } catch { console.warn(`skipping image ${e.id}: bad id`); continue; }
+        let buf;
+        try { buf = await fs.readFile(path.join(imgDir, e.file)); } catch { console.warn(`skipping image ${e.id}: missing ${e.file}`); continue; }
+        const doc = {
+          contentType: e.contentType || 'application/octet-stream',
+          size: e.size != null ? e.size : buf.length,
+          filename: e.filename || e.file,
+          data: new Binary(buf),
+          createdAt: e.createdAt ? new Date(e.createdAt) : new Date(),
+        };
+        await imagesCol.updateOne({ _id }, { $set: doc }, { upsert: true });
+        imgRestored++;
+      }
+    }
+
+    console.log(`Restored ${restored} note(s), ${refRestored} reference(s), and ${imgRestored} image(s) from ${BACKUP_DIR}`);
   } finally {
     await client.close();
   }

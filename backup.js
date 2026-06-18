@@ -25,6 +25,16 @@ function frontmatter(doc) {
   return lines.join('\n');
 }
 
+// File extension for an image content type (best-effort; cosmetic only — the
+// authoritative content type is preserved in images/index.json).
+const IMAGE_EXT = {
+  'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',
+  'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/bmp': 'bmp',
+};
+function imageExt(contentType) {
+  return IMAGE_EXT[contentType] || 'bin';
+}
+
 function refFrontmatter(doc) {
   const lines = [
     '---',
@@ -62,6 +72,30 @@ async function runBackup({ mongoUri = MONGO_URI, dbName = DB_NAME, backupDir = B
         await fs.writeFile(file, refFrontmatter(doc) + (doc.content || '') + '\n', 'utf8');
       }
     }
+    // Uploaded images: write each binary under images/<id>.<ext>, plus an
+    // index.json carrying the metadata (ids, content types) so restore can put
+    // them back with the SAME ids — keeping the ![](/api/images/<id>) links valid.
+    const imgs = await db.collection('images').find({}).sort({ createdAt: 1 }).toArray();
+    if (imgs.length) {
+      const imgDir = path.join(backupDir, 'images');
+      await fs.mkdir(imgDir, { recursive: true });
+      const index = [];
+      for (const doc of imgs) {
+        const id = doc._id.toString();
+        const file = `${id}.${imageExt(doc.contentType)}`;
+        await fs.writeFile(path.join(imgDir, file), doc.data.buffer);
+        index.push({
+          id,
+          file,
+          contentType: doc.contentType,
+          filename: doc.filename,
+          size: doc.size,
+          createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : null,
+        });
+      }
+      await fs.writeFile(path.join(imgDir, 'index.json'), JSON.stringify(index, null, 2) + '\n', 'utf8');
+    }
+
     return docs.length;
   } finally {
     await client.close();
