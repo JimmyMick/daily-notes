@@ -104,7 +104,7 @@ app.put('/api/settings', async (req, res, next) => {
 // Trigger a backup on demand (also used by the scheduled job).
 app.post('/api/backup', async (req, res, next) => {
   try {
-    const count = await runBackup();
+    const count = await performBackup();
     res.json({ ok: true, count });
   } catch (err) {
     next(err);
@@ -346,6 +346,32 @@ async function start() {
   await loadSettings();
   app.listen(PORT, () => console.log(`daily-notes listening on :${PORT}`));
   rescheduleBackup();
+  catchUpBackup();
+}
+
+// Run a backup if the last one is missing or >24h old. Covers the macOS case
+// where the machine was asleep at the scheduled hour (in-process timers don't
+// fire while the host sleeps, so the daily run can be silently missed). Skipped
+// when scheduled backups are turned off.
+async function catchUpBackup() {
+  if (settings.backupSchedule === 'off') return;
+  try {
+    const doc = await settingsCol.findOne({ _id: 'app' }, { projection: { lastBackupAt: 1 } });
+    const last = doc && doc.lastBackupAt ? new Date(doc.lastBackupAt).getTime() : 0;
+    const age = Date.now() - last;
+    if (age < 24 * 60 * 60 * 1000) return;
+    const n = await performBackup();
+    console.log(`[catch-up backup] last backup ${last ? Math.round(age / 3.6e6) + 'h ago' : 'never'} — wrote ${n} note(s)`);
+  } catch (err) {
+    console.error('[catch-up backup] failed:', err.message);
+  }
+}
+
+// Run a backup and record when it happened (powers the catch-up check).
+async function performBackup() {
+  const n = await runBackup();
+  await settingsCol.updateOne({ _id: 'app' }, { $set: { lastBackupAt: new Date() } }, { upsert: true });
+  return n;
 }
 
 // Load persisted settings (seeded from env on first run).
@@ -385,7 +411,7 @@ function rescheduleBackup() {
 
 async function doBackup() {
   try {
-    const n = await runBackup();
+    const n = await performBackup();
     console.log(`[scheduled backup] wrote ${n} note(s)`);
   } catch (err) {
     console.error('[scheduled backup] failed:', err.message);
