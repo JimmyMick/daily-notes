@@ -319,6 +319,17 @@ main .EasyMDEContainer { flex: 1; min-height: 0; display: flex; flex-direction: 
 .editor-preview th, .editor-preview-side th { background: var(--th-bg); }
 /* Keep uploaded images (screenshots) from overflowing the preview. */
 .editor-preview img, .editor-preview-side img { max-width: 100%; height: auto; }
+/* Code blocks/inline code: theme the background and text together so they stay
+   readable in both light and dark (EasyMDE's default preview code bg is light). */
+.editor-preview pre, .editor-preview-side pre,
+.editor-preview code, .editor-preview-side code {
+  background: var(--code-bg);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.editor-preview code, .editor-preview-side code { padding: .15em .35em; border-radius: 4px; font-size: .9em; }
+.editor-preview pre, .editor-preview-side pre { padding: 12px; border-radius: 6px; overflow: auto; }
+.editor-preview pre code, .editor-preview-side pre code { background: none; padding: 0; }
 
 /* --- EasyMDE / CodeMirror dark overrides ---------------------------------- */
 /* EasyMDE ships light styling; in dark mode recolor the editor, toolbar and
