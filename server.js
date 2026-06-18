@@ -2,7 +2,8 @@
 
 const path = require('path');
 const express = require('express');
-const { MongoClient } = require('mongodb');
+const multer = require('multer');
+const { MongoClient, ObjectId, Binary } = require('mongodb');
 const { runBackup } = require('./backup');
 const email = require('./email');
 const news = require('./news');
@@ -29,6 +30,15 @@ app.use(express.static(path.join(__dirname, 'public')));
 let notes; // collection handle, set on startup
 let references; // reference-notes collection handle (named, not dated)
 let settingsCol; // settings collection handle
+let images; // uploaded images (binary) collection handle
+
+// Image uploads: accept common image types, hold in memory, cap the size.
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_IMAGE_BYTES },
+  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+});
 // Runtime settings, seeded from env, overridable via the Settings panel.
 let settings = {
   backupSchedule: BACKUP_SCHEDULE, // 'on' | 'off'
@@ -158,6 +168,51 @@ app.get('/api/news', async (req, res) => {
     console.error('[news] route failed:', err.message);
     res.json({ items: [], fetchedAt: 0 });
   }
+});
+
+// Upload an image (from the editor's button, paste, or drag-and-drop). Stores
+// the binary in Mongo and returns a URL to embed as markdown. The field name is
+// "image"; multer rejects non-images via fileFilter (req.file is then absent).
+app.post('/api/images', upload.single('image'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'no image file (must be an image type under 10 MB)' });
+    const doc = {
+      contentType: req.file.mimetype,
+      size: req.file.size,
+      filename: req.file.originalname || 'image',
+      data: new Binary(req.file.buffer),
+      createdAt: new Date(),
+    };
+    const { insertedId } = await images.insertOne(doc);
+    res.status(201).json({ url: `/api/images/${insertedId}` });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Serve an uploaded image by id.
+app.get('/api/images/:id', async (req, res, next) => {
+  try {
+    let _id;
+    try { _id = new ObjectId(req.params.id); } catch { return res.status(400).json({ error: 'bad image id' }); }
+    const doc = await images.findOne({ _id });
+    if (!doc) return res.status(404).json({ error: 'no such image' });
+    res.setHeader('Content-Type', doc.contentType || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // ids are stable
+    res.send(doc.data.buffer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Multer errors (e.g. file too large) arrive as a special error type — surface
+// a clean message instead of the generic 500 handler.
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    const msg = err.code === 'LIMIT_FILE_SIZE' ? 'image exceeds the 10 MB limit' : err.message;
+    return res.status(400).json({ error: msg });
+  }
+  next(err);
 });
 
 // Latest sports scores for the second ticker line (live/final/today's games),
@@ -456,6 +511,7 @@ async function start() {
   // One reference per slug; text index over title + content for future search.
   await references.createIndex({ slug: 1 }, { unique: true });
   await references.createIndex({ title: 'text', content: 'text' });
+  images = db.collection('images'); // uploaded image binaries, served by _id
   settingsCol = db.collection('settings');
   await loadSettings();
   app.listen(PORT, () => console.log(`daily-notes listening on :${PORT}`));

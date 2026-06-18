@@ -230,6 +230,8 @@ main .EasyMDEContainer { flex: 1; min-height: 0; display: flex; flex-direction: 
   border: 1px solid #d0d7de; padding: 6px 12px;
 }
 .editor-preview th, .editor-preview-side th { background: #f6f8fa; }
+/* Keep uploaded images (screenshots) from overflowing the preview. */
+.editor-preview img, .editor-preview-side img { max-width: 100%; height: auto; }
 
 /* --- ticker rows (news + scores) ------------------------------------------ */
 /* Pinned to the viewport bottom so the tickers stay put while content scrolls.

@@ -45,9 +45,30 @@ const editor = new EasyMDE({
   status: false,
   placeholder: 'Write today\'s notes in markdown…',
   previewRender: (plainText) => (window.marked ? marked.parse(plainText) : plainText),
+  // Image upload: toolbar button + paste + drag-and-drop (great for screenshots).
+  // Uploads go to /api/images and the returned URL is inserted as markdown.
+  uploadImage: true,
+  imageMaxSize: 10 * 1024 * 1024,
+  imageAccept: 'image/png, image/jpeg, image/gif, image/webp, image/*',
+  imageUploadFunction: uploadImage,
   toolbar: ['bold', 'italic', 'heading', '|', 'unordered-list', 'ordered-list',
-    'code', 'quote', 'table', timestampButton, '|', 'link', 'preview', 'side-by-side', 'fullscreen'],
+    'code', 'quote', 'table', timestampButton, '|', 'link', 'upload-image', 'preview', 'side-by-side', 'fullscreen'],
 });
+
+// Called by EasyMDE for button/paste/drag uploads. onSuccess(url) inserts the
+// markdown image; onError(msg) shows a message in EasyMDE's status line.
+async function uploadImage(file, onSuccess, onError) {
+  try {
+    const form = new FormData();
+    form.append('image', file);
+    const res = await fetch('/api/images', { method: 'POST', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { onError(data.error || 'upload failed'); return; }
+    onSuccess(data.url);
+  } catch (e) {
+    onError('upload failed');
+  }
+}
 
 const datePicker = document.getElementById('datePicker');
 const searchBox = document.getElementById('searchBox');

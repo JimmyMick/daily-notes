@@ -10,6 +10,7 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 
 - One document per day, keyed by `YYYY-MM-DD`
 - **Reference notes** — named, evergreen notes that aren't tied to a date
+- **Image uploads** — paste, drag-and-drop, or upload screenshots into notes
 - **Jump to any date** with the date picker
 - **Search** across all note content (MongoDB text index)
 - **Summarize** a note with a local **Ollama** model (✨ button)
@@ -88,6 +89,27 @@ Until both are set, the ✉ button reports that email isn't configured and sends
 nothing. Mail is sent **from** `GMAIL_USER`. Set a default recipient in the
 **Settings** panel (it defaults to your own address, so you can mail notes to
 yourself).
+
+## Images
+
+You can drop images (screenshots, photos) straight into a note three ways:
+
+- **Paste** from the clipboard (e.g. a screenshot) into the editor
+- **Drag and drop** an image file onto the editor
+- The **upload-image** toolbar button
+
+Each upload is stored in MongoDB (an `images` collection) and inserted as a
+markdown image — `![](/api/images/<id>)` — so it renders in the preview and the
+note stays small. Limits: image types only, up to **10 MB** each. Served with a
+long cache lifetime (ids are stable).
+
+> **Notes / current limits**
+> - **Backups:** markdown exports reference images by URL, but the image
+>   binaries live in Mongo (the `mongo_data` volume), not in `backups/`. A
+>   markdown-only restore keeps the links but not the image data.
+> - **Email:** emailed notes reference images as `/api/images/...` on this
+>   server, so they only load where that server is reachable. Embedding images
+>   inline in email is a possible follow-up.
 
 ## News ticker
 
@@ -217,6 +239,21 @@ Collection `references` (one per named, evergreen note):
 - Unique index on `slug` → one note per slug (immutable; title is renameable)
 - Text index on `title` + `content`
 
+Collection `images` (uploaded image binaries):
+
+```json
+{
+  "_id": "ObjectId",
+  "contentType": "image/png",
+  "size": 12345,
+  "filename": "screenshot.png",
+  "data": "<binary>",
+  "createdAt": "2026-06-17T14:00:00.000Z"
+}
+```
+
+- Served at `/api/images/<_id>`; referenced from notes as `![](/api/images/<_id>)`
+
 ## API
 
 | Method | Path | Purpose |
@@ -230,6 +267,8 @@ Collection `references` (one per named, evergreen note):
 | `POST` | `/api/email` | Email a note (`{ "kind": "daily"\|"reference", "id": "…", "to": "…" }`) |
 | `GET` | `/api/news` | Latest ticker headlines (configurable sources), limited per source |
 | `GET` | `/api/scores` | Latest sports scores for the scores ticker (ESPN) |
+| `POST` | `/api/images` | Upload an image (multipart field `image`), returns `{ url }` |
+| `GET` | `/api/images/:id` | Serve an uploaded image by id |
 | `GET` | `/api/references` | List reference notes (alphabetical by title) |
 | `POST` | `/api/references` | Create a reference note (`{ "title": "…" }`), returns its `slug` |
 | `GET` | `/api/references/:slug` | Fetch a reference note |
