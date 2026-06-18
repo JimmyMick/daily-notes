@@ -116,6 +116,8 @@ hovering the ticker pauses it so you can read or click.
 
 - Headlines refresh every 5 minutes; the server caches each feed (5-min TTL) so
   client polling doesn't hammer the sources.
+- **Show tickers** — a toggle in **Settings** hides/shows the whole ticker bar
+  (when hidden, polling stops too). On by default.
 - **Headlines per source** is configurable in **Settings** (1–20, default **3**).
 - **News sources** is an editable list in **Settings** — one per line as
   `Name | https://feed-url` (the name is optional; a bare URL works and the name
@@ -201,6 +203,7 @@ Click **⚙** in the header for an in-app Settings panel:
 - **Backup time** — hour of day (local time)
 - **Last backup** — when the most recent backup ran (absolute time + relative hint)
 - **Back up now** — run a backup immediately
+- **Show tickers** — show/hide the news + scores ticker bar
 - **Email notes to** — default recipient for the ✉ button
 - **Headlines per source** — how many headlines each news source contributes to the ticker (1–20)
 - **News sources** — the editable feed list (`Name | URL` per line, RSS/Atom)

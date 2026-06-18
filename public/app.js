@@ -616,6 +616,25 @@ async function refreshScores() {
   }
 }
 
+// Show/hide the whole ticker bar and start/stop polling to match. Persisted as
+// the showTickers setting.
+let newsTimer = null;
+let scoresTimer = null;
+function applyTickerVisibility(show) {
+  tickersEl.hidden = !show;
+  if (show) {
+    refreshNews();
+    refreshScores();
+    if (!newsTimer) newsTimer = setInterval(refreshNews, NEWS_POLL_MS);
+    if (!scoresTimer) scoresTimer = setInterval(refreshScores, SCORES_POLL_MS);
+  } else {
+    clearInterval(newsTimer);
+    clearInterval(scoresTimer);
+    newsTimer = scoresTimer = null;
+  }
+  reserveTickerSpace(); // 0 when hidden, footer height when shown
+}
+
 // --- settings -------------------------------------------------------------
 const settingsBtn = document.getElementById('settingsBtn');
 const settingsOverlay = document.getElementById('settingsOverlay');
@@ -624,6 +643,7 @@ const setBackupSchedule = document.getElementById('setBackupSchedule');
 const setBackupHour = document.getElementById('setBackupHour');
 const setEmailTo = document.getElementById('setEmailTo');
 const setNewsCount = document.getElementById('setNewsCount');
+const setShowTickers = document.getElementById('setShowTickers');
 const setNewsSources = document.getElementById('setNewsSources');
 const lastBackupVal = document.getElementById('lastBackupVal');
 const settingsStatus = document.getElementById('settingsStatus');
@@ -683,6 +703,7 @@ settingsBtn.addEventListener('click', async () => {
   setBackupHour.value = s.backupHour;
   setEmailTo.value = s.emailTo || '';
   setNewsCount.value = s.newsCount != null ? s.newsCount : 3;
+  setShowTickers.checked = s.showTickers !== false;
   setNewsSources.value = sourcesToText(s.newsSources);
   lastBackupVal.textContent = formatBackupTime(s.lastBackupAt);
   settingsOverlay.hidden = false;
@@ -700,6 +721,7 @@ document.getElementById('saveSettings').addEventListener('click', async () => {
       emailTo: setEmailTo.value.trim(),
       newsCount: Number(setNewsCount.value),
       newsSources: textToSources(setNewsSources.value),
+      showTickers: setShowTickers.checked,
     }),
   });
   if (!res.ok) {
@@ -711,8 +733,8 @@ document.getElementById('saveSettings').addEventListener('click', async () => {
   settingsStatus.textContent = 'saved ✓';
   // Keep the Email button's prefill in sync with the saved default.
   emailConfig.defaultTo = s.emailTo || '';
-  // Apply a changed headline count / source list to the ticker immediately.
-  refreshNews();
+  // Apply ticker visibility + a changed count / source list immediately.
+  applyTickerVisibility(s.showTickers !== false);
   // Reflect the new default model in the header dropdown selection.
   if ([...modelSelect.options].some((o) => o.value === s.defaultModel)) {
     modelSelect.value = s.defaultModel;
@@ -739,8 +761,11 @@ datePicker.addEventListener('change', () => {
   await refreshNoteList();
   await refreshRefList();
   await loadDate(currentDate);
-  refreshNews();
-  refreshScores();
-  setInterval(refreshNews, NEWS_POLL_MS);
-  setInterval(refreshScores, SCORES_POLL_MS);
+  // Honor the saved show/hide preference (starts polling only when shown).
+  try {
+    const s = await (await fetch('/api/settings')).json();
+    applyTickerVisibility(s.showTickers !== false);
+  } catch (e) {
+    applyTickerVisibility(true);
+  }
 })();

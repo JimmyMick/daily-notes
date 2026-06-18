@@ -266,6 +266,7 @@ main .EasyMDEContainer { flex: 1; min-height: 0; display: flex; flex-direction: 
   bottom: 0;
   z-index: 5;
 }
+#tickers[hidden] { display: none; }
 .ticker {
   display: flex;
   align-items: center;

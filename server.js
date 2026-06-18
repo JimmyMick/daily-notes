@@ -48,6 +48,7 @@ let settings = {
   emailTo: process.env.GMAIL_USER || '', // default recipient for "Email note"
   newsCount: parseInt(process.env.NEWS_COUNT || '3', 10) || 3, // headlines per source in the ticker
   newsSources: news.DEFAULT_SOURCES, // [{ name, url }] feeds for the ticker
+  showTickers: true, // show the news/scores ticker bar
 };
 
 // Validate/normalize a user-supplied news-source list. Each entry needs an
@@ -140,6 +141,7 @@ app.put('/api/settings', async (req, res, next) => {
       if (!sources) return res.status(400).json({ error: 'each news source needs a valid http(s) URL' });
       next_.newsSources = sources;
     }
+    if (req.body.showTickers !== undefined) next_.showTickers = !!req.body.showTickers;
     settings = next_;
     await settingsCol.updateOne({ _id: 'app' }, { $set: settings }, { upsert: true });
     rescheduleBackup(); // apply schedule changes immediately
@@ -576,6 +578,7 @@ async function loadSettings() {
       emailTo: doc.emailTo || settings.emailTo || '',
       newsCount: doc.newsCount || settings.newsCount || 3,
       newsSources: Array.isArray(doc.newsSources) && doc.newsSources.length ? doc.newsSources : news.DEFAULT_SOURCES,
+      showTickers: doc.showTickers !== false,
     };
   } else {
     await settingsCol.insertOne({ _id: 'app', ...settings });
