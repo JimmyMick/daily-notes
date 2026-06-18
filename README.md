@@ -15,7 +15,8 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 - **Summarize** a note with a local **Ollama** model (✨ button)
 - **Email a note** (daily or reference) via Gmail (✉ button)
 - **Insert a timestamp** anchor with the 🕒 toolbar button (time-tag diary entries)
-- **News ticker** — scrolling headlines from NPR, NRK, and ESPN along the bottom
+- **News ticker** — scrolling headlines from NPR, BBC, NRK, and ESPN along the bottom
+- **Scores ticker** — a second line with live/final sports scores (ESPN)
 - Autosave as you type (debounced)
 - A sidebar list of every day that has a note
 
@@ -113,6 +114,16 @@ out of the box — just paste the feed URL. Examples: BBC
 The one exception is **ESPN**, whose RSS is defunct — its headlines come from
 ESPN's JSON "now" news API, which `news.js` recognizes by URL. Other proprietary
 JSON APIs won't parse; stick to RSS/Atom feeds for anything you add.
+
+### Scores ticker
+
+A second ticker line below the news shows the **latest sports scores** from
+ESPN's public scoreboard API — **live games first** (with a red dot), then
+finals, then today's upcoming games. It covers NFL, MLB, NBA, NHL, and the World
+Cup, and refreshes every minute. Each game links to its ESPN page; hovering
+pauses the line. Offseason leagues simply contribute nothing. The leagues are
+defined in `scores.js` (ESPN's scoreboard is JSON, not a generic feed, so this
+list isn't user-editable like the news sources).
 
 ## Run it
 
@@ -217,7 +228,8 @@ Collection `references` (one per named, evergreen note):
 | `POST` | `/api/summarize` | Summarize content via Ollama (`{ "content": "…", "model"?: "…" }`) |
 | `GET` | `/api/email/status` | Whether Gmail is configured + the default recipient |
 | `POST` | `/api/email` | Email a note (`{ "kind": "daily"\|"reference", "id": "…", "to": "…" }`) |
-| `GET` | `/api/news` | Latest ticker headlines (NPR/NRK/ESPN), limited per source |
+| `GET` | `/api/news` | Latest ticker headlines (configurable sources), limited per source |
+| `GET` | `/api/scores` | Latest sports scores for the scores ticker (ESPN) |
 | `GET` | `/api/references` | List reference notes (alphabetical by title) |
 | `POST` | `/api/references` | Create a reference note (`{ "title": "…" }`), returns its `slug` |
 | `GET` | `/api/references/:slug` | Fetch a reference note |

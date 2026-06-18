@@ -113,9 +113,15 @@
   </main>
   </div>
 
-  <footer id="ticker" hidden title="Latest headlines — click to open; hover to pause">
-    <span class="ticker-label">📰</span>
-    <div class="ticker-viewport"><div class="ticker-track" id="tickerTrack"></div></div>
+  <footer id="tickers">
+    <div class="ticker" id="newsTicker" hidden title="Latest headlines — click to open; hover to pause">
+      <span class="ticker-label">📰</span>
+      <div class="ticker-viewport"><div class="ticker-track" id="newsTrack"></div></div>
+    </div>
+    <div class="ticker" id="scoresTicker" hidden title="Latest scores — click to open; hover to pause">
+      <span class="ticker-label">🏆</span>
+      <div class="ticker-viewport"><div class="ticker-track" id="scoresTrack"></div></div>
+    </div>
   </footer>
 
   <script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>

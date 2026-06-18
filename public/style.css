@@ -229,9 +229,9 @@ main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding
 }
 .editor-preview th, .editor-preview-side th { background: #f6f8fa; }
 
-/* --- news ticker ---------------------------------------------------------- */
-#ticker {
-  flex-shrink: 0;
+/* --- ticker rows (news + scores) ------------------------------------------ */
+#tickers { flex-shrink: 0; }
+.ticker {
   display: flex;
   align-items: center;
   height: 36px;
@@ -239,7 +239,7 @@ main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding
   background: #fff;
   font-size: 13px;
 }
-#ticker[hidden] { display: none; }
+.ticker[hidden] { display: none; }
 .ticker-label {
   flex-shrink: 0;
   padding: 0 12px;
@@ -247,7 +247,7 @@ main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding
   line-height: 36px;
   background: #f7f8fa;
 }
-/* Clips the moving track and hides the off-screen headlines. */
+/* Clips the moving track and hides the off-screen items. */
 .ticker-viewport { flex: 1; overflow: hidden; }
 .ticker-track {
   display: inline-flex;
@@ -256,8 +256,8 @@ main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding
   will-change: transform;
   animation: ticker-scroll linear infinite;
 }
-/* Pause so a headline can be read/clicked. */
-#ticker:hover .ticker-track { animation-play-state: paused; }
+/* Pause so an item can be read/clicked. */
+.ticker:hover .ticker-track { animation-play-state: paused; }
 /* The track holds two copies of the headlines; translating by -50% loops
    seamlessly back to the start. Duration is set in JS for a steady speed. */
 @keyframes ticker-scroll {
@@ -275,3 +275,6 @@ main .EasyMDEContainer { flex: 1; display: flex; flex-direction: column; padding
   margin-right: 7px;
 }
 .ticker-track .sep { color: #c4c9d2; }
+/* Live games: red league tag + a small dot so they stand out. */
+.ticker-item.live .src { color: #d11; }
+.ticker-item.live .src::after { content: " ●"; font-size: 8px; vertical-align: middle; }

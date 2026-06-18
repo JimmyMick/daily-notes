@@ -6,6 +6,7 @@ const { MongoClient } = require('mongodb');
 const { runBackup } = require('./backup');
 const email = require('./email');
 const news = require('./news');
+const scores = require('./scores');
 
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017';
@@ -156,6 +157,18 @@ app.get('/api/news', async (req, res) => {
   } catch (err) {
     console.error('[news] route failed:', err.message);
     res.json({ items: [], fetchedAt: 0 });
+  }
+});
+
+// Latest sports scores for the second ticker line (live/final/today's games),
+// served from a short-lived in-memory cache (see scores.js).
+app.get('/api/scores', async (req, res) => {
+  try {
+    const data = await scores.getScores();
+    res.json(data);
+  } catch (err) {
+    console.error('[scores] route failed:', err.message);
+    res.json({ games: [], fetchedAt: 0 });
   }
 });
 

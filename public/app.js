@@ -459,26 +459,30 @@ emailBtn.addEventListener('click', async () => {
   }
 });
 
-// --- news ticker ----------------------------------------------------------
-const ticker = document.getElementById('ticker');
-const tickerTrack = document.getElementById('tickerTrack');
-const TICKER_POLL_MS = 5 * 60 * 1000; // refetch headlines every 5 min
+// --- tickers (news headlines + sports scores) -----------------------------
+const newsTicker = document.getElementById('newsTicker');
+const newsTrack = document.getElementById('newsTrack');
+const scoresTicker = document.getElementById('scoresTicker');
+const scoresTrack = document.getElementById('scoresTrack');
+const NEWS_POLL_MS = 5 * 60 * 1000; // headlines change slowly
+const SCORES_POLL_MS = 60 * 1000; // scores change fast
 
-// Build one copy of the headlines (items + bullet separators) as DOM nodes.
-// Using textContent (not innerHTML) keeps feed titles safe from HTML injection.
+// Build one copy of a ticker's items (tag + text + bullet separators) as DOM
+// nodes. textContent (not innerHTML) keeps feed/score text safe from injection.
+// Each item: { tag, text, link, live? }.
 function buildTickerCopy(items) {
   const frag = document.createDocumentFragment();
   for (const it of items) {
     const a = document.createElement('a');
-    a.className = 'ticker-item';
+    a.className = it.live ? 'ticker-item live' : 'ticker-item';
     a.href = it.link || '#';
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
-    const src = document.createElement('span');
-    src.className = 'src';
-    src.textContent = it.source;
-    a.appendChild(src);
-    a.appendChild(document.createTextNode(it.title));
+    const tag = document.createElement('span');
+    tag.className = 'src';
+    tag.textContent = it.tag;
+    a.appendChild(tag);
+    a.appendChild(document.createTextNode(it.text));
     frag.appendChild(a);
     const sep = document.createElement('span');
     sep.className = 'sep';
@@ -488,25 +492,34 @@ function buildTickerCopy(items) {
   return frag;
 }
 
-function renderTicker(items) {
-  tickerTrack.innerHTML = '';
-  if (!items.length) { ticker.hidden = true; return; }
+// Fill one ticker row. Hides the row when there's nothing to show.
+function fillTicker(trackEl, tickerEl, items) {
+  trackEl.innerHTML = '';
+  if (!items.length) { tickerEl.hidden = true; return; }
   // Two copies back-to-back so the -50% scroll loops seamlessly.
-  tickerTrack.appendChild(buildTickerCopy(items));
-  tickerTrack.appendChild(buildTickerCopy(items));
-  ticker.hidden = false;
-  // Set a steady speed (~70 px/s) regardless of how many/long the headlines are.
+  trackEl.appendChild(buildTickerCopy(items));
+  trackEl.appendChild(buildTickerCopy(items));
+  tickerEl.hidden = false;
+  // Steady speed (~70 px/s) regardless of how many/long the items are.
   requestAnimationFrame(() => {
-    const oneCopy = tickerTrack.scrollWidth / 2;
-    tickerTrack.style.animationDuration = Math.max(20, Math.round(oneCopy / 70)) + 's';
+    const oneCopy = trackEl.scrollWidth / 2;
+    trackEl.style.animationDuration = Math.max(20, Math.round(oneCopy / 70)) + 's';
   });
 }
 
-async function refreshTicker() {
+async function refreshNews() {
   try {
-    const res = await fetch('/api/news');
-    const data = await res.json();
-    renderTicker(data.items || []);
+    const data = await (await fetch('/api/news')).json();
+    fillTicker(newsTrack, newsTicker, (data.items || []).map((i) => ({ tag: i.source, text: i.title, link: i.link })));
+  } catch (e) {
+    // Leave whatever's currently scrolling; try again next poll.
+  }
+}
+
+async function refreshScores() {
+  try {
+    const data = await (await fetch('/api/scores')).json();
+    fillTicker(scoresTrack, scoresTicker, (data.games || []).map((g) => ({ tag: g.league, text: g.text, link: g.link, live: g.live })));
   } catch (e) {
     // Leave whatever's currently scrolling; try again next poll.
   }
@@ -592,8 +605,8 @@ document.getElementById('saveSettings').addEventListener('click', async () => {
   settingsStatus.textContent = 'saved ✓';
   // Keep the Email button's prefill in sync with the saved default.
   emailConfig.defaultTo = s.emailTo || '';
-  // Apply a changed headline count to the ticker immediately.
-  refreshTicker();
+  // Apply a changed headline count / source list to the ticker immediately.
+  refreshNews();
   // Reflect the new default model in the header dropdown selection.
   if ([...modelSelect.options].some((o) => o.value === s.defaultModel)) {
     modelSelect.value = s.defaultModel;
@@ -619,6 +632,8 @@ datePicker.addEventListener('change', () => {
   await refreshNoteList();
   await refreshRefList();
   await loadDate(currentDate);
-  refreshTicker();
-  setInterval(refreshTicker, TICKER_POLL_MS);
+  refreshNews();
+  refreshScores();
+  setInterval(refreshNews, NEWS_POLL_MS);
+  setInterval(refreshScores, SCORES_POLL_MS);
 })();
