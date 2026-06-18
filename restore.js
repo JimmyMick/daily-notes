@@ -58,7 +58,33 @@ async function main() {
       await notes.updateOne({ date }, { $set: doc, $setOnInsert: setOnInsert }, { upsert: true });
       restored++;
     }
-    console.log(`Restored ${restored} note(s) from ${BACKUP_DIR}`);
+
+    // Restore reference notes from the references/ subfolder, upsert by slug.
+    const references = client.db(DB_NAME).collection('references');
+    const refDir = path.join(BACKUP_DIR, 'references');
+    let refFiles = [];
+    try {
+      refFiles = (await fs.readdir(refDir)).filter((f) => f.endsWith('.md'));
+    } catch {
+      // no references folder — nothing to restore
+    }
+    let refRestored = 0;
+    for (const file of refFiles) {
+      const text = await fs.readFile(path.join(refDir, file), 'utf8');
+      const { meta, body } = parse(text);
+      const slug = meta.slug || path.basename(file, '.md');
+      const doc = {
+        slug,
+        title: meta.title || slug,
+        content: body.replace(/\n$/, ''),
+        updatedAt: meta.updatedAt ? new Date(meta.updatedAt) : new Date(),
+      };
+      const setOnInsert = { createdAt: meta.createdAt ? new Date(meta.createdAt) : new Date() };
+      await references.updateOne({ slug }, { $set: doc, $setOnInsert: setOnInsert }, { upsert: true });
+      refRestored++;
+    }
+
+    console.log(`Restored ${restored} note(s) and ${refRestored} reference(s) from ${BACKUP_DIR}`);
   } finally {
     await client.close();
   }

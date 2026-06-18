@@ -25,6 +25,12 @@
     <h2 id="notesHeading">All notes</h2>
     <label class="archived-toggle"><input type="checkbox" id="showArchived" /> Show archived</label>
     <ul id="noteList"></ul>
+
+    <div class="ref-head">
+      <h2>Reference notes</h2>
+      <button id="newRefBtn" title="Create a reference note">+ New</button>
+    </div>
+    <ul id="refList"></ul>
   </aside>
 
   <main>
@@ -35,6 +41,8 @@
         <select id="modelSelect" title="Ollama model used for summaries"></select>
         <button id="summarizeBtn" title="Summarize this note with local Ollama">✨ Summarize</button>
         <button id="archiveBtn" title="Archive this day (kept in the store, hidden from the list)">🗄 Archive</button>
+        <button id="renameRefBtn" title="Rename this reference note" hidden>✎ Rename</button>
+        <button id="deleteRefBtn" title="Delete this reference note" hidden>🗑 Delete</button>
         <button id="settingsBtn" title="Settings">⚙</button>
       </div>
     </header>

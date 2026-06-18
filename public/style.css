@@ -47,16 +47,39 @@ body {
 
 /* Scope the list reset to the sidebar lists only — a global `ul` reset
    also strips bullets/indentation from lists in the markdown preview. */
-#noteList, #searchResults { list-style: none; margin: 0; padding: 0; }
+#noteList, #searchResults, #refList { list-style: none; margin: 0; padding: 0; }
 
-#noteList li, #searchResults li {
+#noteList li, #searchResults li, #refList li {
   padding: 8px 10px;
   border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
 }
-#noteList li:hover, #searchResults li:hover { background: #eef1f6; }
-#noteList li.active { background: #e0e9ff; font-weight: 600; }
+#noteList li:hover, #searchResults li:hover, #refList li:hover { background: #eef1f6; }
+#noteList li.active, #refList li.active { background: #e0e9ff; font-weight: 600; }
+
+/* Reference-notes section header with its inline "+ New" button. */
+.ref-head { display: flex; align-items: center; justify-content: space-between; margin: 22px 0 8px; }
+#sidebar .ref-head h2 { margin: 0; }
+#newRefBtn {
+  border: 1px solid #d6dae1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+#newRefBtn:hover { background: #eef1f6; }
+
+#renameRefBtn, #deleteRefBtn {
+  border: 1px solid #d6dae1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+#renameRefBtn:hover, #deleteRefBtn:hover { background: #eef1f6; }
 
 #searchResults { margin-top: 8px; }
 #searchResults li { border: 1px solid #eef1f6; margin-bottom: 6px; }

@@ -10,6 +10,9 @@ function todayISO() {
 let currentDate = todayISO();
 let saveTimer = null;
 let loading = false;
+// The shared editor shows either a dated daily note or a named reference note.
+let mode = 'daily'; // 'daily' | 'reference'
+let currentRef = null; // { slug, title } when mode === 'reference'
 
 const editor = new EasyMDE({
   element: document.getElementById('editor'),
@@ -30,6 +33,10 @@ const statusEl = document.getElementById('status');
 const archiveBtn = document.getElementById('archiveBtn');
 const showArchived = document.getElementById('showArchived');
 const notesHeading = document.getElementById('notesHeading');
+const refList = document.getElementById('refList');
+const newRefBtn = document.getElementById('newRefBtn');
+const renameRefBtn = document.getElementById('renameRefBtn');
+const deleteRefBtn = document.getElementById('deleteRefBtn');
 
 // --- editor change -> debounced autosave ----------------------------------
 editor.codemirror.on('change', () => {
@@ -39,7 +46,12 @@ editor.codemirror.on('change', () => {
   saveTimer = setTimeout(save, 800);
 });
 
+// Route autosave to the daily note or reference note currently in the editor.
 async function save() {
+  return mode === 'reference' ? saveReference() : saveDaily();
+}
+
+async function saveDaily() {
   const content = editor.value();
   statusEl.textContent = 'saving…';
   try {
@@ -55,12 +67,31 @@ async function save() {
   }
 }
 
+async function saveReference() {
+  if (!currentRef) return;
+  const content = editor.value();
+  statusEl.textContent = 'saving…';
+  try {
+    await fetch(`/api/references/${currentRef.slug}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    statusEl.textContent = 'saved ✓';
+    refreshRefList();
+  } catch (e) {
+    statusEl.textContent = 'save failed';
+  }
+}
+
 // --- load a day -----------------------------------------------------------
 async function loadDate(date) {
   // flush any pending edits for the day we're leaving
   clearTimeout(saveTimer);
   if (!loading && editor.value()) await save();
 
+  currentRef = null;
+  setMode('daily');
   currentDate = date;
   datePicker.value = date;
   currentDateEl.textContent = formatHeading(date);
@@ -139,9 +170,103 @@ archiveBtn.addEventListener('click', async () => {
 
 function highlightActive() {
   for (const li of noteList.children) {
-    li.classList.toggle('active', li.dataset.date === currentDate);
+    li.classList.toggle('active', mode === 'daily' && li.dataset.date === currentDate);
+  }
+  for (const li of refList.children) {
+    li.classList.toggle('active', mode === 'reference' && currentRef && li.dataset.slug === currentRef.slug);
   }
 }
+
+// --- reference notes ------------------------------------------------------
+// Toggle the header controls that apply to each note kind.
+function setMode(m) {
+  mode = m;
+  const isRef = m === 'reference';
+  archiveBtn.hidden = isRef;
+  renameRefBtn.hidden = !isRef;
+  deleteRefBtn.hidden = !isRef;
+}
+
+async function refreshRefList() {
+  const res = await fetch('/api/references');
+  const docs = await res.json();
+  refList.innerHTML = '';
+  if (!docs.length) {
+    const li = document.createElement('li');
+    li.textContent = 'No reference notes';
+    li.style.color = '#8a91a0';
+    li.style.cursor = 'default';
+    refList.appendChild(li);
+  }
+  for (const doc of docs) {
+    const li = document.createElement('li');
+    li.textContent = doc.title;
+    li.dataset.slug = doc.slug;
+    li.onclick = () => loadReference(doc.slug);
+    refList.appendChild(li);
+  }
+  highlightActive();
+}
+
+async function loadReference(slug) {
+  // flush any pending edits for the note we're leaving
+  clearTimeout(saveTimer);
+  if (!loading && editor.value()) await save();
+
+  loading = true;
+  try {
+    const res = await fetch(`/api/references/${slug}`);
+    if (!res.ok) { statusEl.textContent = '⚠️ reference not found'; return; }
+    const doc = await res.json();
+    currentRef = { slug: doc.slug, title: doc.title };
+    setMode('reference');
+    currentDateEl.textContent = doc.title;
+    editor.value(doc.content || '');
+    statusEl.textContent = 'loaded';
+  } finally {
+    loading = false;
+  }
+  highlightActive();
+}
+
+newRefBtn.addEventListener('click', async () => {
+  const title = prompt('Title for the new reference note:');
+  if (!title || !title.trim()) return;
+  const res = await fetch('/api/references', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: title.trim() }),
+  });
+  if (!res.ok) { statusEl.textContent = '⚠️ could not create reference'; return; }
+  const doc = await res.json();
+  await refreshRefList();
+  loadReference(doc.slug);
+});
+
+renameRefBtn.addEventListener('click', async () => {
+  if (!currentRef) return;
+  const title = prompt('Rename reference note:', currentRef.title);
+  if (!title || !title.trim() || title.trim() === currentRef.title) return;
+  const res = await fetch(`/api/references/${currentRef.slug}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: title.trim() }),
+  });
+  if (!res.ok) { statusEl.textContent = '⚠️ rename failed'; return; }
+  currentRef.title = title.trim();
+  currentDateEl.textContent = currentRef.title;
+  refreshRefList();
+});
+
+deleteRefBtn.addEventListener('click', async () => {
+  if (!currentRef) return;
+  if (!confirm(`Delete reference note “${currentRef.title}”? This cannot be undone.`)) return;
+  const res = await fetch(`/api/references/${currentRef.slug}`, { method: 'DELETE' });
+  if (!res.ok) { statusEl.textContent = '⚠️ delete failed'; return; }
+  currentRef = null; // discard the editor's now-deleted content
+  await refreshRefList();
+  loadDate(todayISO());
+});
 
 // --- search ---------------------------------------------------------------
 let searchTimer = null;
@@ -324,5 +449,6 @@ datePicker.addEventListener('change', () => {
 (async function init() {
   await loadModels();
   await refreshNoteList();
+  await refreshRefList();
   await loadDate(currentDate);
 })();

@@ -25,17 +25,42 @@ function frontmatter(doc) {
   return lines.join('\n');
 }
 
-// Export all notes to BACKUP_DIR. Returns the number of notes written.
+function refFrontmatter(doc) {
+  const lines = [
+    '---',
+    `slug: ${doc.slug}`,
+    `title: ${doc.title}`,
+    doc.createdAt ? `createdAt: ${new Date(doc.createdAt).toISOString()}` : null,
+    doc.updatedAt ? `updatedAt: ${new Date(doc.updatedAt).toISOString()}` : null,
+    '---',
+    '',
+  ].filter((l) => l !== null);
+  return lines.join('\n');
+}
+
+// Export all notes to BACKUP_DIR (daily notes as YYYY-MM-DD.md, reference notes
+// under references/<slug>.md). Returns the number of daily notes written.
 async function runBackup({ mongoUri = MONGO_URI, dbName = DB_NAME, backupDir = BACKUP_DIR } = {}) {
   const client = new MongoClient(mongoUri);
   await client.connect();
   try {
-    const notes = client.db(dbName).collection('notes');
+    const db = client.db(dbName);
+    const notes = db.collection('notes');
     const docs = await notes.find({}).sort({ date: 1 }).toArray();
     await fs.mkdir(backupDir, { recursive: true });
     for (const doc of docs) {
       const file = path.join(backupDir, `${doc.date}.md`);
       await fs.writeFile(file, frontmatter(doc) + (doc.content || '') + '\n', 'utf8');
+    }
+    // Reference notes go in their own subfolder, keyed by slug.
+    const refs = await db.collection('references').find({}).sort({ slug: 1 }).toArray();
+    if (refs.length) {
+      const refDir = path.join(backupDir, 'references');
+      await fs.mkdir(refDir, { recursive: true });
+      for (const doc of refs) {
+        const file = path.join(refDir, `${doc.slug}.md`);
+        await fs.writeFile(file, refFrontmatter(doc) + (doc.content || '') + '\n', 'utf8');
+      }
     }
     return docs.length;
   } finally {

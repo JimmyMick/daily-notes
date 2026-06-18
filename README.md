@@ -9,6 +9,7 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 ## Features
 
 - One document per day, keyed by `YYYY-MM-DD`
+- **Reference notes** — named, evergreen notes that aren't tied to a date
 - **Jump to any date** with the date picker
 - **Search** across all note content (MongoDB text index)
 - **Summarize** a note with a local **Ollama** model (✨ button)
@@ -29,6 +30,25 @@ Summaries **stream token-by-token** as the model generates them, so larger
 models stay responsive. Use **Insert into note** to append a summary under a
 `## Summary` heading. (A first call on a cold model pauses while Ollama loads
 it into memory, then streams.)
+
+## Reference notes
+
+Daily notes are one-per-day. **Reference notes** are the other kind: named,
+evergreen pages that don't belong to any date — things like *Wifi passwords*,
+*Book list*, or *Gift ideas*. They live in the **Reference notes** section of
+the sidebar, below the daily list.
+
+- **+ New** prompts for a title and drops you into the editor.
+- They share the same markdown editor and autosave as daily notes.
+- The header swaps the **🗄 Archive** button for **✎ Rename** and **🗑 Delete**
+  while a reference note is open.
+- **Rename** changes only the display title. Each note keeps a fixed `slug`
+  (derived from its first title), so renaming never breaks its backup file or
+  links to it. **Delete** is permanent and asks for confirmation first.
+
+Reference notes are stored in their own `references` collection and are
+included in [backups](#backup--restore) (under `backups/references/`). They are
+not yet wired into the top search box — that searches daily notes only.
 
 ## Run it
 
@@ -65,6 +85,10 @@ Each file has a small frontmatter block (`date`, `archived`, `createdAt`,
 state too. `restore` upserts by date, so it's safe to re-run and only touches
 the dates present in the folder.
 
+**Reference notes** are backed up alongside daily notes, under
+`backups/references/<slug>.md` (frontmatter: `slug`, `title`, `createdAt`,
+`updatedAt`). `restore` upserts them by `slug`.
+
 A **daily backup runs automatically** while the app is up (default 2am local).
 Configure it in the **Settings** panel (⚙) or via env vars.
 
@@ -100,6 +124,21 @@ Collection `notes`:
 - Unique index on `date` → one note per day
 - Text index on `content` → search
 
+Collection `references` (one per named, evergreen note):
+
+```json
+{
+  "slug": "wifi-passwords",
+  "title": "Wifi Passwords",
+  "content": "# Guest network\n\n- …",
+  "createdAt": "2026-06-17T14:00:00.000Z",
+  "updatedAt": "2026-06-17T15:30:00.000Z"
+}
+```
+
+- Unique index on `slug` → one note per slug (immutable; title is renameable)
+- Text index on `title` + `content`
+
 ## API
 
 | Method | Path | Purpose |
@@ -109,6 +148,11 @@ Collection `notes`:
 | `PUT` | `/api/notes/:date` | Create/update a day's note (`{ "content": "…" }`) |
 | `GET` | `/api/search?q=…` | Full-text search, returns date + snippet |
 | `POST` | `/api/summarize` | Summarize content via Ollama (`{ "content": "…", "model"?: "…" }`) |
+| `GET` | `/api/references` | List reference notes (alphabetical by title) |
+| `POST` | `/api/references` | Create a reference note (`{ "title": "…" }`), returns its `slug` |
+| `GET` | `/api/references/:slug` | Fetch a reference note |
+| `PUT` | `/api/references/:slug` | Update content and/or title (`{ "content"?: "…", "title"?: "…" }`) |
+| `DELETE` | `/api/references/:slug` | Delete a reference note (permanent) |
 
 ## Config
 

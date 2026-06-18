@@ -24,6 +24,7 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 let notes; // collection handle, set on startup
+let references; // reference-notes collection handle (named, not dated)
 let settingsCol; // settings collection handle
 // Runtime settings, seeded from env, overridable via the Settings panel.
 let settings = {
@@ -236,6 +237,83 @@ async function setArchived(req, res, next, archived) {
   }
 }
 
+// --- reference notes ------------------------------------------------------
+// Named, evergreen notes that aren't tied to a date (e.g. "Wifi passwords",
+// "Book list"). Keyed by an immutable slug derived from the title at creation;
+// the title can be renamed freely without breaking the slug.
+function slugify(s) {
+  return s.toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+// List all reference notes (title + slug), alphabetical by title.
+app.get('/api/references', async (req, res, next) => {
+  try {
+    const docs = await references
+      .find({}, { projection: { _id: 0, slug: 1, title: 1, updatedAt: 1 } })
+      .collation({ locale: 'en', strength: 1 })
+      .sort({ title: 1 })
+      .toArray();
+    res.json(docs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Create a new reference note from a title. Generates a unique slug.
+app.post('/api/references', async (req, res, next) => {
+  try {
+    const title = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const base = slugify(title) || 'note';
+    let slug = base;
+    for (let n = 2; await references.findOne({ slug }); n++) slug = `${base}-${n}`;
+    const now = new Date();
+    await references.insertOne({ slug, title, content: '', createdAt: now, updatedAt: now });
+    res.status(201).json({ slug, title, content: '', updatedAt: now });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Read a single reference note.
+app.get('/api/references/:slug', async (req, res, next) => {
+  try {
+    const doc = await references.findOne({ slug: req.params.slug }, { projection: { _id: 0 } });
+    if (!doc) return res.status(404).json({ error: 'no such reference' });
+    res.json(doc);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Update a reference note's content and/or title (slug stays fixed).
+app.put('/api/references/:slug', async (req, res, next) => {
+  try {
+    const set = { updatedAt: new Date() };
+    if (typeof req.body.content === 'string') set.content = req.body.content;
+    if (typeof req.body.title === 'string' && req.body.title.trim()) set.title = req.body.title.trim();
+    const result = await references.updateOne({ slug: req.params.slug }, { $set: set });
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'no such reference' });
+    res.json({ slug: req.params.slug, ...set });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete a reference note (hard delete; the UI confirms first).
+app.delete('/api/references/:slug', async (req, res, next) => {
+  try {
+    const result = await references.deleteOne({ slug: req.params.slug });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'no such reference' });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: 'internal error' });
@@ -260,6 +338,10 @@ async function start() {
   await notes.createIndex({ date: 1 }, { unique: true });
   // Full-text search over content.
   await notes.createIndex({ content: 'text' });
+  references = db.collection('references');
+  // One reference per slug; text index over title + content for future search.
+  await references.createIndex({ slug: 1 }, { unique: true });
+  await references.createIndex({ title: 'text', content: 'text' });
   settingsCol = db.collection('settings');
   await loadSettings();
   app.listen(PORT, () => console.log(`daily-notes listening on :${PORT}`));
