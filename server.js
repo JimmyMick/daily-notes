@@ -15,6 +15,12 @@ const DB_NAME = process.env.DB_NAME || 'daily_notes';
 // Ollama runs on the host; from inside the container reach it via host.docker.internal.
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:7b-instruct';
+// Instruction sent to the model before the note content (the note is appended
+// after a "---" separator). Override with SUMMARY_PROMPT in the environment.
+const SUMMARY_PROMPT = process.env.SUMMARY_PROMPT ||
+  'Summarize the following daily notes into a few concise bullet points. ' +
+  'Capture key tasks, decisions, and takeaways. Use markdown bullets. ' +
+  'Do not add anything that is not in the notes.';
 // Scheduled daily backup. Disable with BACKUP_SCHEDULE=off; set the hour (0-23
 // local time) with BACKUP_HOUR (default 2am).
 const BACKUP_SCHEDULE = (process.env.BACKUP_SCHEDULE || 'on').toLowerCase();
@@ -322,10 +328,7 @@ app.post('/api/summarize', async (req, res, next) => {
   const model = (req.body.model || settings.defaultModel).trim();
   if (!content) return res.status(400).json({ error: 'nothing to summarize' });
 
-  const prompt =
-    'Summarize the following daily notes into a few concise bullet points. ' +
-    'Capture key tasks, decisions, and takeaways. Use markdown bullets. ' +
-    'Do not add anything that is not in the notes.\n\n---\n' + content;
+  const prompt = `${SUMMARY_PROMPT}\n\n---\n${content}`;
 
   let r;
   try {

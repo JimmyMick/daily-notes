@@ -32,6 +32,10 @@ Default model is `qwen2.5:7b-instruct` — a good speed/quality balance for note
 Pull it once with `ollama pull qwen2.5:7b-instruct`. Pick any installed model
 from the dropdown per summary, or change the default with `OLLAMA_MODEL`.
 
+The summarization instruction can be customized with `SUMMARY_PROMPT` (the note
+text is appended after a `---` separator); leave it unset for the built-in
+prompt.
+
 Summaries **stream token-by-token** as the model generates them, so larger
 models stay responsive. Use **Insert into note** to append a summary under a
 `## Summary` heading. (A first call on a cold model pauses while Ollama loads
@@ -290,6 +294,7 @@ Collection `images` (uploaded image binaries):
 | `DB_NAME` | `daily_notes` | Database name |
 | `OLLAMA_URL` | `http://localhost:11434` | Compose sets this to `http://host.docker.internal:11434` |
 | `OLLAMA_MODEL` | `qwen2.5:7b-instruct` | Default summarization model |
+| `SUMMARY_PROMPT` | _(built-in)_ | Instruction sent before the note when summarizing |
 | `BACKUP_DIR` | `/backups` | Where markdown backups are written (mounted to `./backups`) |
 | `BACKUP_SCHEDULE` | `on` | Seeds the daily-backup on/off default (`on`/`off`) |
 | `BACKUP_HOUR` | `2` | Seeds the daily-backup hour (0–23, local time) |

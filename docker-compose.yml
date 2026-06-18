@@ -10,6 +10,8 @@ services:
       # Reach the host's Ollama from inside the container.
       OLLAMA_URL: http://host.docker.internal:11434
       OLLAMA_MODEL: qwen2.5:7b-instruct
+      # Optional: override the instruction used when summarizing a note.
+      SUMMARY_PROMPT: "${SUMMARY_PROMPT:-}"
       BACKUP_DIR: /backups
       # Daily backup: BACKUP_SCHEDULE=on|off, BACKUP_HOUR=0-23 (local time).
       BACKUP_SCHEDULE: "on"
