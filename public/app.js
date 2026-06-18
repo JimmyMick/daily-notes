@@ -492,25 +492,29 @@ function buildTickerCopy(items) {
   return frag;
 }
 
-// Fill one ticker row. Hides the row when there's nothing to show.
-function fillTicker(trackEl, tickerEl, items) {
+// Scroll speeds in px/s. News runs 15% slower than scores for easier reading.
+const SCORES_SPEED = 70;
+const NEWS_SPEED = SCORES_SPEED * 0.85;
+
+// Fill one ticker row. Hides the row when there's nothing to show. `pxPerSec`
+// sets the scroll speed (steady regardless of how many/long the items are).
+function fillTicker(trackEl, tickerEl, items, pxPerSec) {
   trackEl.innerHTML = '';
   if (!items.length) { tickerEl.hidden = true; return; }
   // Two copies back-to-back so the -50% scroll loops seamlessly.
   trackEl.appendChild(buildTickerCopy(items));
   trackEl.appendChild(buildTickerCopy(items));
   tickerEl.hidden = false;
-  // Steady speed (~70 px/s) regardless of how many/long the items are.
   requestAnimationFrame(() => {
     const oneCopy = trackEl.scrollWidth / 2;
-    trackEl.style.animationDuration = Math.max(20, Math.round(oneCopy / 70)) + 's';
+    trackEl.style.animationDuration = Math.max(20, Math.round(oneCopy / pxPerSec)) + 's';
   });
 }
 
 async function refreshNews() {
   try {
     const data = await (await fetch('/api/news')).json();
-    fillTicker(newsTrack, newsTicker, (data.items || []).map((i) => ({ tag: i.source, text: i.title, link: i.link })));
+    fillTicker(newsTrack, newsTicker, (data.items || []).map((i) => ({ tag: i.source, text: i.title, link: i.link })), NEWS_SPEED);
   } catch (e) {
     // Leave whatever's currently scrolling; try again next poll.
   }
@@ -519,7 +523,7 @@ async function refreshNews() {
 async function refreshScores() {
   try {
     const data = await (await fetch('/api/scores')).json();
-    fillTicker(scoresTrack, scoresTicker, (data.games || []).map((g) => ({ tag: g.league, text: g.text, link: g.link, live: g.live })));
+    fillTicker(scoresTrack, scoresTicker, (data.games || []).map((g) => ({ tag: g.league, text: g.text, link: g.link, live: g.live })), SCORES_SPEED);
   } catch (e) {
     // Leave whatever's currently scrolling; try again next poll.
   }
