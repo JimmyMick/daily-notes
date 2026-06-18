@@ -4,6 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Daily Notes</title>
+  <!-- Apply the saved theme before paint to avoid a flash of the wrong theme. -->
+  <script>
+    (function () {
+      try { if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark'); } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css" />
   <link rel="stylesheet" href="/style.css" />
 </head>
@@ -45,6 +51,7 @@
         <button id="archiveBtn" title="Archive this day (kept in the store, hidden from the list)">🗄 Archive</button>
         <button id="renameRefBtn" title="Rename this reference note" hidden>✎ Rename</button>
         <button id="deleteRefBtn" title="Delete this reference note" hidden>🗑 Delete</button>
+        <button id="themeBtn" title="Toggle dark/light theme">🌙</button>
         <button id="settingsBtn" title="Settings">⚙</button>
       </div>
     </header>

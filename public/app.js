@@ -70,6 +70,24 @@ async function uploadImage(file, onSuccess, onError) {
   }
 }
 
+// --- theme (dark / light) -------------------------------------------------
+// The <head> init script already applied the saved theme to avoid a flash;
+// here we sync the toggle button and handle switching. Choice persists in
+// localStorage (a per-device display preference).
+const themeBtn = document.getElementById('themeBtn');
+function currentTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+function applyTheme(theme) {
+  if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  else document.documentElement.removeAttribute('data-theme');
+  themeBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  themeBtn.title = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+  try { localStorage.setItem('theme', theme); } catch (e) { /* ignore */ }
+}
+themeBtn.addEventListener('click', () => applyTheme(currentTheme() === 'dark' ? 'light' : 'dark'));
+applyTheme(currentTheme()); // sync button to the pre-applied theme
+
 const datePicker = document.getElementById('datePicker');
 const searchBox = document.getElementById('searchBox');
 const searchResults = document.getElementById('searchResults');

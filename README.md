@@ -11,6 +11,7 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 - One document per day, keyed by `YYYY-MM-DD`
 - **Reference notes** — named, evergreen notes that aren't tied to a date
 - **Image uploads** — paste, drag-and-drop, or upload screenshots into notes
+- **Dark / light theme** — toggle in the header (🌙/☀️), remembered per device
 - **Jump to any date** with the date picker
 - **Search** across all note content (MongoDB text index)
 - **Summarize** a note with a local **Ollama** model (✨ button)
