@@ -52,6 +52,7 @@
         <button id="renameRefBtn" title="Rename this reference note" hidden>✎ Rename</button>
         <button id="deleteRefBtn" title="Delete this reference note" hidden>🗑 Delete</button>
         <button id="themeBtn" title="Toggle dark/light theme">🌙</button>
+        <button id="tasksToggleBtn" title="Show/hide the task list" aria-expanded="false">☑ Tasks</button>
         <button id="settingsBtn" title="Settings">⚙</button>
       </div>
     </header>
@@ -128,6 +129,18 @@
     </div>
     <textarea id="editor"></textarea>
   </main>
+
+  <aside id="taskPanel">
+    <div class="task-head">
+      <strong>☑ Tasks</strong>
+      <span id="taskCount" class="muted"></span>
+      <button id="clearDoneBtn" title="Remove all completed tasks">Clear done</button>
+    </div>
+    <form id="taskForm">
+      <input id="taskInput" type="text" placeholder="Add a task…" autocomplete="off" maxlength="500" />
+    </form>
+    <ul id="taskList"></ul>
+  </aside>
   </div>
 
   <footer id="tickers">

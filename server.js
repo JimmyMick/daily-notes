@@ -37,6 +37,7 @@ let notes; // collection handle, set on startup
 let references; // reference-notes collection handle (named, not dated)
 let settingsCol; // settings collection handle
 let images; // uploaded images (binary) collection handle
+let tasks; // task/todo list collection handle
 let lastBackupAt = null; // when the last backup ran (Date), surfaced in settings
 
 // Image uploads: accept common image types, hold in memory, cap the size.
@@ -507,6 +508,70 @@ app.delete('/api/references/:slug', async (req, res, next) => {
   }
 });
 
+// --- tasks / todo list ----------------------------------------------------
+// A single global checklist shown in the right panel. Open tasks first, then
+// completed; within each group, oldest first.
+app.get('/api/tasks', async (req, res, next) => {
+  try {
+    const docs = await tasks
+      .find({}, { projection: { text: 1, done: 1, createdAt: 1 } })
+      .sort({ done: 1, createdAt: 1 })
+      .toArray();
+    res.json(docs.map((d) => ({ id: d._id.toString(), text: d.text, done: !!d.done, createdAt: d.createdAt })));
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/tasks', async (req, res, next) => {
+  try {
+    const text = typeof req.body.text === 'string' ? req.body.text.trim() : '';
+    if (!text) return res.status(400).json({ error: 'text is required' });
+    const now = new Date();
+    const { insertedId } = await tasks.insertOne({ text, done: false, createdAt: now, updatedAt: now });
+    res.status(201).json({ id: insertedId.toString(), text, done: false, createdAt: now });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.patch('/api/tasks/:id', async (req, res, next) => {
+  try {
+    let _id;
+    try { _id = new ObjectId(req.params.id); } catch { return res.status(400).json({ error: 'bad task id' }); }
+    const set = { updatedAt: new Date() };
+    if (typeof req.body.done === 'boolean') set.done = req.body.done;
+    if (typeof req.body.text === 'string' && req.body.text.trim()) set.text = req.body.text.trim();
+    const result = await tasks.updateOne({ _id }, { $set: set });
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'no such task' });
+    res.json({ id: req.params.id, ...set });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.delete('/api/tasks/:id', async (req, res, next) => {
+  try {
+    let _id;
+    try { _id = new ObjectId(req.params.id); } catch { return res.status(400).json({ error: 'bad task id' }); }
+    const result = await tasks.deleteOne({ _id });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'no such task' });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Clear all completed tasks at once.
+app.delete('/api/tasks', async (req, res, next) => {
+  try {
+    const result = await tasks.deleteMany({ done: true });
+    res.json({ ok: true, deleted: result.deletedCount });
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: 'internal error' });
@@ -536,6 +601,8 @@ async function start() {
   await references.createIndex({ slug: 1 }, { unique: true });
   await references.createIndex({ title: 'text', content: 'text' });
   images = db.collection('images'); // uploaded image binaries, served by _id
+  tasks = db.collection('tasks'); // global todo list
+  await tasks.createIndex({ done: 1, createdAt: 1 });
   settingsCol = db.collection('settings');
   await loadSettings();
   app.listen(PORT, () => console.log(`daily-notes listening on :${PORT}`));

@@ -75,6 +75,101 @@ body {
   overflow-y: auto;
 }
 
+/* Expandable right panel for the task list. Collapsed = width 0; the
+   .tasks-open class on #app slides it open. */
+#taskPanel {
+  width: 0;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-left: 1px solid transparent;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  transition: width .18s ease;
+}
+#app.tasks-open #taskPanel {
+  width: 300px;
+  border-left-color: var(--border);
+}
+#taskPanel .task-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 16px 10px;
+  border-bottom: 1px solid var(--divider);
+}
+#taskPanel .task-head strong { font-size: 15px; }
+#taskPanel #taskCount { font-size: 12px; }
+#taskPanel #clearDoneBtn {
+  margin-left: auto;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+#taskPanel #clearDoneBtn:hover { background: var(--hover); }
+#taskPanel #clearDoneBtn[hidden] { display: none; }
+
+#taskForm { padding: 12px 16px; }
+#taskForm #taskInput {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+#taskList { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; }
+#taskList .task-empty { color: var(--muted); font-size: 13px; padding: 8px; }
+#taskList .task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+}
+#taskList .task:hover { background: var(--hover); }
+#taskList .task input[type="checkbox"] { margin: 0; flex-shrink: 0; cursor: pointer; }
+#taskList .task-text { flex: 1; font-size: 14px; word-break: break-word; cursor: text; }
+#taskList .task.done .task-text { text-decoration: line-through; color: var(--muted); }
+#taskList .task-edit {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+}
+#taskList .task-del {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0;
+  flex-shrink: 0;
+}
+#taskList .task:hover .task-del { opacity: 1; }
+#taskList .task-del:hover { color: var(--live); }
+
+#tasksToggleBtn {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+#tasksToggleBtn:hover { background: var(--hover); }
+#tasksToggleBtn.active { background: var(--active-bg); border-color: var(--accent); }
+
 #sidebar h1 { font-size: 20px; margin: 0 0 20px; }
 #sidebar h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 22px 0 8px; }
 

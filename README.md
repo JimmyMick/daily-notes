@@ -17,6 +17,7 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 - **Summarize** a note with a local **Ollama** model (✨ button)
 - **Email a note** (daily or reference) via Gmail (✉ button)
 - **Insert a timestamp** anchor with the 🕒 toolbar button (time-tag diary entries)
+- **Task list** — an expandable right panel (☑ Tasks) for a global todo checklist
 - **News ticker** — scrolling headlines from NPR, BBC, NRK, and ESPN along the bottom
 - **Scores ticker** — a second line with live/final sports scores (ESPN)
 - Autosave as you type (debounced)
@@ -111,6 +112,18 @@ long cache lifetime (ids are stable).
 Images are included in [backups](#backup--restore) (under `backups/images/`) and
 embedded inline when a note is [emailed](#email-a-note), so screenshots render in
 the recipient's inbox.
+
+## Task list
+
+Click **☑ Tasks** in the header to slide open a right-hand panel with a global
+todo checklist (the open/closed state is remembered per device).
+
+- Type in the box and press Enter to **add** a task.
+- **Check** the box to complete it (completed tasks sink to the bottom, struck through).
+- **Double-click** a task to edit its text; **✕** deletes it; **Clear done** removes all completed.
+
+Tasks are stored in a `tasks` collection and included in backup/restore
+(`tasks.json`), so they round-trip with the rest of your data.
 
 ## News ticker
 

@@ -773,7 +773,120 @@ datePicker.addEventListener('change', () => {
 });
 
 // --- boot -----------------------------------------------------------------
+// --- tasks / todo panel ---------------------------------------------------
+const appEl = document.getElementById('app');
+const taskPanel = document.getElementById('taskPanel');
+const tasksToggleBtn = document.getElementById('tasksToggleBtn');
+const taskForm = document.getElementById('taskForm');
+const taskInput = document.getElementById('taskInput');
+const taskList = document.getElementById('taskList');
+const taskCount = document.getElementById('taskCount');
+const clearDoneBtn = document.getElementById('clearDoneBtn');
+
+// Show/hide the panel; the open state is a per-device preference.
+function applyTasksOpen(open) {
+  appEl.classList.toggle('tasks-open', open);
+  tasksToggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  tasksToggleBtn.classList.toggle('active', open);
+  try { localStorage.setItem('tasksOpen', open ? '1' : '0'); } catch (e) { /* ignore */ }
+  if (open) refreshTasks();
+}
+tasksToggleBtn.addEventListener('click', () => applyTasksOpen(!appEl.classList.contains('tasks-open')));
+
+async function refreshTasks() {
+  let docs = [];
+  try { docs = await (await fetch('/api/tasks')).json(); } catch (e) { return; }
+  taskList.innerHTML = '';
+  const open = docs.filter((t) => !t.done).length;
+  taskCount.textContent = docs.length ? `${open} open` : '';
+  clearDoneBtn.hidden = !docs.some((t) => t.done);
+  if (!docs.length) {
+    const li = document.createElement('li');
+    li.className = 'task-empty';
+    li.textContent = 'No tasks yet';
+    taskList.appendChild(li);
+    return;
+  }
+  for (const t of docs) {
+    const li = document.createElement('li');
+    li.className = 'task' + (t.done ? ' done' : '');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = t.done;
+    cb.addEventListener('change', () => toggleTask(t.id, cb.checked));
+    const span = document.createElement('span');
+    span.className = 'task-text';
+    span.textContent = t.text; // textContent — never inject HTML from user text
+    span.title = 'Double-click to edit';
+    span.addEventListener('dblclick', () => editTask(t, span));
+    const del = document.createElement('button');
+    del.className = 'task-del';
+    del.textContent = '✕';
+    del.title = 'Delete task';
+    del.addEventListener('click', () => deleteTask(t.id));
+    li.append(cb, span, del);
+    taskList.appendChild(li);
+  }
+}
+
+taskForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = taskInput.value.trim();
+  if (!text) return;
+  taskInput.value = '';
+  await fetch('/api/tasks', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+  });
+  refreshTasks();
+});
+
+async function toggleTask(id, done) {
+  await fetch(`/api/tasks/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done }),
+  });
+  refreshTasks();
+}
+
+async function deleteTask(id) {
+  await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+  refreshTasks();
+}
+
+// Inline-edit a task's text on double-click.
+function editTask(t, span) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'task-edit';
+  input.value = t.text;
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+  let committed = false;
+  const commit = async () => {
+    if (committed) return;
+    committed = true;
+    const v = input.value.trim();
+    if (v && v !== t.text) {
+      await fetch(`/api/tasks/${t.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: v }),
+      });
+    }
+    refreshTasks();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { committed = true; refreshTasks(); }
+  });
+}
+
+clearDoneBtn.addEventListener('click', async () => {
+  await fetch('/api/tasks', { method: 'DELETE' });
+  refreshTasks();
+});
+
 (async function init() {
+  try { applyTasksOpen(localStorage.getItem('tasksOpen') === '1'); } catch (e) { /* closed by default */ }
   await loadModels();
   await loadEmailConfig();
   await refreshNoteList();

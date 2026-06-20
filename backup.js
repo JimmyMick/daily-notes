@@ -96,6 +96,19 @@ async function runBackup({ mongoUri = MONGO_URI, dbName = DB_NAME, backupDir = B
       await fs.writeFile(path.join(imgDir, 'index.json'), JSON.stringify(index, null, 2) + '\n', 'utf8');
     }
 
+    // Task/todo list: small, so a single tasks.json (keeps ids for round-trip).
+    const taskDocs = await db.collection('tasks').find({}).sort({ createdAt: 1 }).toArray();
+    if (taskDocs.length) {
+      const tasksOut = taskDocs.map((t) => ({
+        id: t._id.toString(),
+        text: t.text,
+        done: t.done === true,
+        createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : null,
+        updatedAt: t.updatedAt ? new Date(t.updatedAt).toISOString() : null,
+      }));
+      await fs.writeFile(path.join(backupDir, 'tasks.json'), JSON.stringify(tasksOut, null, 2) + '\n', 'utf8');
+    }
+
     return docs.length;
   } finally {
     await client.close();

@@ -113,7 +113,31 @@ async function main() {
       }
     }
 
-    console.log(`Restored ${restored} note(s), ${refRestored} reference(s), and ${imgRestored} image(s) from ${BACKUP_DIR}`);
+    // Restore the task/todo list from tasks.json, upsert by original _id.
+    let taskIndex = [];
+    try {
+      taskIndex = JSON.parse(await fs.readFile(path.join(BACKUP_DIR, 'tasks.json'), 'utf8'));
+    } catch {
+      // no tasks.json — nothing to restore
+    }
+    let taskRestored = 0;
+    if (Array.isArray(taskIndex) && taskIndex.length) {
+      const tasksCol = client.db(DB_NAME).collection('tasks');
+      for (const t of taskIndex) {
+        let _id;
+        try { _id = new ObjectId(t.id); } catch { console.warn(`skipping task ${t.id}: bad id`); continue; }
+        const doc = {
+          text: t.text || '',
+          done: t.done === true,
+          updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date(),
+        };
+        const setOnInsert = { createdAt: t.createdAt ? new Date(t.createdAt) : new Date() };
+        await tasksCol.updateOne({ _id }, { $set: doc, $setOnInsert: setOnInsert }, { upsert: true });
+        taskRestored++;
+      }
+    }
+
+    console.log(`Restored ${restored} note(s), ${refRestored} reference(s), ${imgRestored} image(s), and ${taskRestored} task(s) from ${BACKUP_DIR}`);
   } finally {
     await client.close();
   }
