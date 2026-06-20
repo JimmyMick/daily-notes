@@ -1089,6 +1089,88 @@ copyLinkBtn.addEventListener('click', async () => {
   }
 });
 
+// --- chatbot (ask your data) ----------------------------------------------
+const chatBtn = document.getElementById('chatBtn');
+const chatOverlay = document.getElementById('chatOverlay');
+const chatMessages = document.getElementById('chatMessages');
+const chatForm = document.getElementById('chatForm');
+const chatInput = document.getElementById('chatInput');
+const chatModel = document.getElementById('chatModel');
+
+let chatHistory = []; // [{ role, content }] sent to /api/chat each turn
+let chatBusy = false;
+
+chatBtn.addEventListener('click', () => {
+  chatOverlay.hidden = false;
+  chatModel.textContent = modelSelect.value ? `via ${modelSelect.value}` : '';
+  if (!chatMessages.children.length) {
+    addChatBubble('assistant', 'Ask me anything about your notes, references, or tasks.');
+  }
+  chatInput.focus();
+});
+document.getElementById('closeChat').onclick = () => { chatOverlay.hidden = true; };
+chatOverlay.addEventListener('click', (e) => { if (e.target === chatOverlay) chatOverlay.hidden = true; });
+document.getElementById('clearChat').addEventListener('click', () => {
+  chatHistory = [];
+  chatMessages.innerHTML = '';
+});
+
+function addChatBubble(role, text) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + role;
+  if (role === 'assistant' && window.marked) div.innerHTML = marked.parse(text || '');
+  else div.textContent = text || '';
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return div;
+}
+
+chatForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = chatInput.value.trim();
+  if (!q || chatBusy) return;
+  chatInput.value = '';
+  chatBusy = true;
+  addChatBubble('user', q);
+  chatHistory.push({ role: 'user', content: q });
+  const bubble = addChatBubble('assistant', '');
+  bubble.classList.add('streaming');
+  bubble.textContent = '…';
+  let answer = '';
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: chatHistory, model: modelSelect.value }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      bubble.textContent = `⚠️ ${data.error || 'chat failed'}`;
+      return;
+    }
+    if (res.headers.get('X-Model')) chatModel.textContent = `via ${res.headers.get('X-Model')}`;
+    bubble.textContent = '';
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      answer += decoder.decode(value, { stream: true });
+      bubble.textContent = answer; // plain text while streaming
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    answer = answer.trim();
+    if (window.marked) bubble.innerHTML = marked.parse(answer || '_(no answer)_');
+    else bubble.textContent = answer || '(no answer)';
+    chatHistory.push({ role: 'assistant', content: answer });
+  } catch (err) {
+    bubble.textContent = '⚠️ request failed';
+  } finally {
+    bubble.classList.remove('streaming');
+    chatBusy = false;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+});
+
 (async function init() {
   try { applyTasksOpen(localStorage.getItem('tasksOpen') === '1'); } catch (e) { /* closed by default */ }
   await loadModels();

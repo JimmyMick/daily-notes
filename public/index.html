@@ -54,9 +54,27 @@
         <button id="deleteRefBtn" title="Delete this reference note" hidden>🗑 Delete</button>
         <button id="themeBtn" title="Toggle dark/light theme">🌙</button>
         <button id="tasksToggleBtn" title="Show/hide the task list" aria-expanded="false">☑ Tasks</button>
+        <button id="chatBtn" title="Ask the LLM about your notes and tasks">💬 Chat</button>
         <button id="settingsBtn" title="Settings">⚙</button>
       </div>
     </header>
+
+    <div id="chatOverlay" hidden>
+      <div id="chatModal">
+        <div class="chat-head">
+          <strong>💬 Ask your notes</strong>
+          <span id="chatModel" class="muted"></span>
+          <button id="clearChat" title="Start a new conversation">Clear</button>
+          <button id="closeChat" title="Close">✕</button>
+        </div>
+        <div id="chatMessages"></div>
+        <form id="chatForm">
+          <input id="chatInput" type="text" placeholder="Ask about your notes, references, tasks…" autocomplete="off" />
+          <button type="submit" id="chatSend">Send</button>
+        </form>
+        <p class="chat-note">Answers come from your local Ollama model, grounded in your MongoDB data.</p>
+      </div>
+    </div>
 
     <div id="settingsOverlay" hidden>
       <div id="settingsModal">

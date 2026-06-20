@@ -381,6 +381,135 @@ app.post('/api/summarize', async (req, res, next) => {
   }
 });
 
+// Build a compact snapshot of the MongoDB data to ground the chatbot's answers.
+// Includes overall counts, the full task list, reference titles, and the notes
+// most relevant to the question (text search, falling back to most recent).
+async function buildDataContext(question) {
+  const parts = [];
+
+  // Notes: counts + date range.
+  const total = await notes.countDocuments({ archived: { $ne: true } });
+  const newest = await notes.find({ archived: { $ne: true } }, { projection: { date: 1 } }).sort({ date: -1 }).limit(1).toArray();
+  const oldest = await notes.find({ archived: { $ne: true } }, { projection: { date: 1 } }).sort({ date: 1 }).limit(1).toArray();
+  parts.push(`Daily notes: ${total} note(s)` +
+    (newest.length ? `, spanning ${oldest[0].date} to ${newest[0].date}.` : '.'));
+
+  // Most relevant notes by text search; fall back to most recent.
+  let relevant = [];
+  if (question) {
+    relevant = await notes.find(
+      { $text: { $search: question }, archived: { $ne: true } },
+      { projection: { date: 1, content: 1, score: { $meta: 'textScore' } } }
+    ).sort({ score: { $meta: 'textScore' } }).limit(6).toArray();
+  }
+  if (!relevant.length) {
+    relevant = await notes.find({ archived: { $ne: true } }, { projection: { date: 1, content: 1 } })
+      .sort({ date: -1 }).limit(5).toArray();
+  }
+  if (relevant.length) {
+    parts.push('\nRelevant daily notes:');
+    for (const d of relevant) {
+      const body = (d.content || '').slice(0, 1200);
+      parts.push(`\n## ${d.date}\n${body}${(d.content || '').length > 1200 ? '\n…(truncated)' : ''}`);
+    }
+  }
+
+  // Reference notes (titles + truncated content).
+  const refs = await references.find({}, { projection: { title: 1, content: 1 } }).limit(50).toArray();
+  if (refs.length) {
+    parts.push(`\nReference notes (${refs.length}):`);
+    for (const r of refs) parts.push(`\n## ${r.title}\n${(r.content || '').slice(0, 600)}`);
+  }
+
+  // Tasks (full list — small).
+  const allTasks = await tasks.find({}, { projection: { text: 1, done: 1, category: 1, dueDate: 1 } })
+    .sort({ done: 1, order: 1 }).limit(200).toArray();
+  if (allTasks.length) {
+    parts.push(`\nTasks (${allTasks.length}):`);
+    for (const t of allTasks) {
+      parts.push(`- [${t.done ? 'x' : ' '}] (${t.category || 'personal'}${t.dueDate ? ', due ' + t.dueDate : ''}) ${t.text}`);
+    }
+  }
+
+  return parts.join('\n');
+}
+
+// Chatbot: answer questions about the user's data via local Ollama. Body:
+// { messages: [{role, content}, …], model? }. Streams the answer text.
+app.post('/api/chat', async (req, res, next) => {
+  const history = Array.isArray(req.body.messages) ? req.body.messages : [];
+  const clean = history
+    .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .map((m) => ({ role: m.role, content: m.content }));
+  const lastUser = [...clean].reverse().find((m) => m.role === 'user');
+  if (!lastUser) return res.status(400).json({ error: 'a user message is required' });
+  const model = (req.body.model || settings.defaultModel).trim();
+
+  let dataContext;
+  try {
+    dataContext = await buildDataContext(lastUser.content);
+  } catch (err) {
+    return next(err);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const system = {
+    role: 'system',
+    content:
+      "You are a helpful assistant answering the user's questions about their personal daily-notes app data. " +
+      'Use ONLY the data provided below. If the answer is not in the data, say you do not have that information — do not invent facts. ' +
+      `Be concise and use markdown. Today's date is ${today}.\n\n=== DATA ===\n${dataContext}`,
+  };
+
+  let r;
+  try {
+    r = await fetch(`${OLLAMA_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, messages: [system, ...clean], stream: true }),
+    });
+  } catch (err) {
+    if (err.cause && err.cause.code === 'ECONNREFUSED') {
+      return res.status(502).json({ error: `Cannot reach Ollama at ${OLLAMA_URL}` });
+    }
+    return next(err);
+  }
+  if (!r.ok) {
+    const detail = await r.text().catch(() => '');
+    return res.status(502).json({ error: `Ollama error (${r.status})`, detail });
+  }
+
+  // Stream /api/chat NDJSON: each line carries message.content deltas.
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('X-Model', model);
+  res.setHeader('Cache-Control', 'no-cache');
+  res.flushHeaders();
+
+  let buffer = '';
+  const decoder = new TextDecoder();
+  try {
+    for await (const chunk of r.body) {
+      buffer += decoder.decode(chunk, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf('\n')) !== -1) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        try {
+          const obj = JSON.parse(line);
+          if (obj.message && obj.message.content) res.write(obj.message.content);
+          if (obj.done) return res.end();
+        } catch {
+          // partial/non-JSON line; ignore
+        }
+      }
+    }
+    res.end();
+  } catch (err) {
+    res.end();
+  }
+});
+
 // Fetch a single day's note. Returns empty content if none exists yet.
 app.get('/api/notes/:date', async (req, res, next) => {
   try {
