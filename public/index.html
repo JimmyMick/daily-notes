@@ -51,7 +51,6 @@
         <button id="copyLinkBtn" title="Copy a shareable link to this note">🔗 Link</button>
         <button id="renameRefBtn" title="Rename this reference note" hidden>✎ Rename</button>
         <button id="deleteRefBtn" title="Delete this reference note" hidden>🗑 Delete</button>
-        <button id="themeBtn" title="Toggle dark/light theme">🌙</button>
         <button id="tasksToggleBtn" title="Show/hide the task list" aria-expanded="false">☑ Tasks</button>
         <button id="chatBtn" title="Ask the LLM about your notes and tasks">💬 Chat</button>
         <button id="settingsBtn" title="Settings">⚙</button>
@@ -81,6 +80,11 @@
           <strong>Settings</strong>
           <button id="closeSettings" title="Close">✕</button>
         </div>
+
+        <label class="setting">
+          <span>Dark mode</span>
+          <input type="checkbox" id="setDarkMode" />
+        </label>
 
         <label class="setting">
           <span>Default summary model</span>
