@@ -868,6 +868,28 @@ function renderTask(t, today) {
   const overdue = !t.done && t.dueDate && t.dueDate < today;
   const li = document.createElement('li');
   li.className = 'task' + (t.done ? ' done' : '') + (t.dueDate ? ' has-due' : '') + (overdue ? ' overdue' : '');
+  li.dataset.id = t.id;
+
+  // Drag handle for manual reordering. Only enabled in the unfiltered 'all'
+  // view, where the DOM holds every task (so the saved order stays complete).
+  const handle = document.createElement('span');
+  handle.className = 'task-handle';
+  handle.textContent = '⠿';
+  if (taskFilterValue === 'all') {
+    handle.draggable = true;
+    handle.title = 'Drag to reorder';
+    handle.addEventListener('dragstart', (e) => {
+      draggingLi = li;
+      li.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', t.id); } catch (_) { /* required by some browsers */ }
+    });
+    handle.addEventListener('dragend', () => { li.classList.remove('dragging'); draggingLi = null; persistOrder(); });
+  } else {
+    handle.classList.add('disabled');
+    handle.title = 'Reordering is available in the “All” view';
+  }
+
   const cb = document.createElement('input');
   cb.type = 'checkbox';
   cb.checked = t.done;
@@ -901,8 +923,42 @@ function renderTask(t, today) {
   del.textContent = '✕';
   del.title = 'Delete task';
   del.addEventListener('click', () => deleteTask(t.id));
-  li.append(cb, main, move, del);
+  li.append(handle, cb, main, move, del);
   return li;
+}
+
+// --- drag-to-reorder ------------------------------------------------------
+let draggingLi = null;
+
+// While dragging, move the dragged row to follow the pointer among the others.
+taskList.addEventListener('dragover', (e) => {
+  if (!draggingLi) return;
+  e.preventDefault();
+  const after = dragAfterElement(e.clientY);
+  if (after == null) taskList.appendChild(draggingLi);
+  else taskList.insertBefore(draggingLi, after);
+});
+
+// The task row whose midpoint is just below the pointer (insertion target).
+function dragAfterElement(y) {
+  const rows = [...taskList.querySelectorAll('.task:not(.dragging)')];
+  let closest = { offset: -Infinity, element: null };
+  for (const row of rows) {
+    const box = row.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) closest = { offset, element: row };
+  }
+  return closest.element;
+}
+
+// Save the current DOM order of all task rows.
+async function persistOrder() {
+  const ids = [...taskList.querySelectorAll('.task')].map((li) => li.dataset.id);
+  if (!ids.length) return;
+  await fetch('/api/tasks/reorder', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }),
+  });
+  refreshTasks();
 }
 
 async function setDue(id, value) {

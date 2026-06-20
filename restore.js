@@ -131,6 +131,7 @@ async function main() {
           done: t.done === true,
           dueDate: t.dueDate || null,
           category: t.category === 'work' ? 'work' : 'personal',
+          order: typeof t.order === 'number' ? t.order : new Date(t.createdAt || Date.now()).getTime(),
           updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date(),
         };
         const setOnInsert = { createdAt: t.createdAt ? new Date(t.createdAt) : new Date() };

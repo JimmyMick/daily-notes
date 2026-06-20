@@ -134,6 +134,7 @@ todo checklist (the open/closed state is remembered per device).
 - Type in the box and press Enter to **add** a task.
 - **Check** the box to complete it (completed tasks sink to the bottom, struck through).
 - **Double-click** a task to edit its text; **✕** deletes it; **Clear done** removes all completed.
+- **Drag** the ⠿ handle (in the "All" view) to order tasks however you like; the order is saved.
 
 Tasks are stored in a `tasks` collection and included in backup/restore
 (`tasks.json`), so they round-trip with the rest of your data.

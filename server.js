@@ -533,8 +533,8 @@ function parseCategory(v) {
 app.get('/api/tasks', async (req, res, next) => {
   try {
     const docs = await tasks
-      .find({}, { projection: { text: 1, done: 1, createdAt: 1, dueDate: 1, category: 1 } })
-      .sort({ done: 1, createdAt: 1 })
+      .find({}, { projection: { text: 1, done: 1, createdAt: 1, dueDate: 1, category: 1, order: 1 } })
+      .sort({ done: 1, order: 1, createdAt: 1 })
       .toArray();
     res.json(docs.map((d) => ({
       id: d._id.toString(), text: d.text, done: !!d.done, createdAt: d.createdAt,
@@ -554,8 +554,31 @@ app.post('/api/tasks', async (req, res, next) => {
     const category = req.body.category === undefined ? 'personal' : parseCategory(req.body.category);
     if (category === undefined) return res.status(400).json({ error: 'category must be work or personal' });
     const now = new Date();
-    const { insertedId } = await tasks.insertOne({ text, done: false, dueDate, category, createdAt: now, updatedAt: now });
-    res.status(201).json({ id: insertedId.toString(), text, done: false, dueDate, category, createdAt: now });
+    // New tasks sort to the bottom of the open list (a large order); manual
+    // reordering overwrites these with compact 0..n indices.
+    const order = now.getTime();
+    const { insertedId } = await tasks.insertOne({ text, done: false, dueDate, category, order, createdAt: now, updatedAt: now });
+    res.status(201).json({ id: insertedId.toString(), text, done: false, dueDate, category, order, createdAt: now });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Persist a manual order. Body: { ids: [...] } — the full desired order.
+// Each task's `order` becomes its index. Defined before the :id route so
+// "reorder" isn't captured as a task id.
+app.patch('/api/tasks/reorder', async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body.ids) ? req.body.ids : null;
+    if (!ids) return res.status(400).json({ error: 'ids array is required' });
+    const ops = [];
+    ids.forEach((id, i) => {
+      let _id;
+      try { _id = new ObjectId(id); } catch { return; } // skip bad ids
+      ops.push({ updateOne: { filter: { _id }, update: { $set: { order: i, updatedAt: new Date() } } } });
+    });
+    if (ops.length) await tasks.bulkWrite(ops);
+    res.json({ ok: true, count: ops.length });
   } catch (err) {
     next(err);
   }
@@ -638,7 +661,8 @@ async function start() {
   await references.createIndex({ title: 'text', content: 'text' });
   images = db.collection('images'); // uploaded image binaries, served by _id
   tasks = db.collection('tasks'); // global todo list
-  await tasks.createIndex({ done: 1, createdAt: 1 });
+  await tasks.createIndex({ done: 1, order: 1, createdAt: 1 });
+  await backfillTaskOrder();
   settingsCol = db.collection('settings');
   await loadSettings();
   app.listen(PORT, () => console.log(`daily-notes listening on :${PORT}`));
@@ -670,6 +694,18 @@ async function performBackup() {
   lastBackupAt = new Date();
   await settingsCol.updateOne({ _id: 'app' }, { $set: { lastBackupAt } }, { upsert: true });
   return n;
+}
+
+// Give any tasks created before manual ordering an `order` (by creation time),
+// so they sort sensibly until the user drags them.
+async function backfillTaskOrder() {
+  const legacy = await tasks.find({ order: { $exists: false } }).sort({ createdAt: 1 }).toArray();
+  if (!legacy.length) return;
+  const ops = legacy.map((d) => ({
+    updateOne: { filter: { _id: d._id }, update: { $set: { order: new Date(d.createdAt || Date.now()).getTime() } } },
+  }));
+  await tasks.bulkWrite(ops);
+  console.log(`[tasks] backfilled order for ${ops.length} legacy task(s)`);
 }
 
 // Load persisted settings (seeded from env on first run).

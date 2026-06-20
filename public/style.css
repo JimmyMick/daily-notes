@@ -185,6 +185,20 @@ body {
 }
 #taskList .task:hover { background: var(--hover); }
 #taskList .task input[type="checkbox"] { margin: 0; flex-shrink: 0; cursor: pointer; }
+
+#taskList .task-handle {
+  flex-shrink: 0;
+  color: var(--muted);
+  cursor: grab;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+  user-select: none;
+}
+#taskList .task:hover .task-handle { opacity: .7; }
+#taskList .task-handle:active { cursor: grabbing; }
+#taskList .task-handle.disabled { cursor: default; }
+#taskList .task.dragging { opacity: .5; background: var(--hover); }
 #taskList .task-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 #taskList .task-text { font-size: 14px; word-break: break-word; cursor: text; }
 #taskList .task.done .task-text { text-decoration: line-through; color: var(--muted); }
