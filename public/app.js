@@ -784,7 +784,28 @@ const taskForm = document.getElementById('taskForm');
 const taskInput = document.getElementById('taskInput');
 const taskDue = document.getElementById('taskDue');
 const taskCat = document.getElementById('taskCat');
+const taskFilter = document.getElementById('taskFilter');
 const taskList = document.getElementById('taskList');
+
+// Which category to show: 'all' | 'work' | 'personal' (remembered per device).
+let taskFilterValue = 'all';
+try { taskFilterValue = localStorage.getItem('taskFilter') || 'all'; } catch (e) { /* default all */ }
+
+taskFilter.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-cat]');
+  if (!btn) return;
+  taskFilterValue = btn.dataset.cat;
+  try { localStorage.setItem('taskFilter', taskFilterValue); } catch (err) { /* ignore */ }
+  syncTaskFilterButtons();
+  refreshTasks();
+});
+
+function syncTaskFilterButtons() {
+  for (const b of taskFilter.querySelectorAll('button[data-cat]')) {
+    b.classList.toggle('active', b.dataset.cat === taskFilterValue);
+  }
+}
+syncTaskFilterButtons(); // reflect the persisted filter on load
 
 // Category metadata: label/icon and the "other" category (for the move button).
 const TASK_CATS = {
@@ -808,20 +829,24 @@ async function refreshTasks() {
   let docs = [];
   try { docs = await (await fetch('/api/tasks')).json(); } catch (e) { return; }
   taskList.innerHTML = '';
-  const open = docs.filter((t) => !t.done).length;
-  taskCount.textContent = docs.length ? `${open} open` : '';
-  clearDoneBtn.hidden = !docs.some((t) => t.done);
-  if (!docs.length) {
+  // Apply the category filter (All / Work / Personal).
+  const shown = taskFilterValue === 'all'
+    ? docs
+    : docs.filter((t) => (t.category || 'personal') === taskFilterValue);
+  const open = shown.filter((t) => !t.done).length;
+  taskCount.textContent = shown.length ? `${open} open` : '';
+  clearDoneBtn.hidden = !shown.some((t) => t.done);
+  if (!shown.length) {
     const li = document.createElement('li');
     li.className = 'task-empty';
-    li.textContent = 'No tasks yet';
+    li.textContent = docs.length ? 'No tasks in this view' : 'No tasks yet';
     taskList.appendChild(li);
     return;
   }
   const today = todayISO();
   // Group into Work and Personal sections (docs are already sorted open-first).
   for (const cat of ['work', 'personal']) {
-    const inCat = docs.filter((t) => (t.category || 'personal') === cat);
+    const inCat = shown.filter((t) => (t.category || 'personal') === cat);
     if (!inCat.length) continue;
     const meta = TASK_CATS[cat];
     const head = document.createElement('li');

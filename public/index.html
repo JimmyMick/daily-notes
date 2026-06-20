@@ -137,6 +137,11 @@
       <span id="taskCount" class="muted"></span>
       <button id="clearDoneBtn" title="Remove all completed tasks">Clear done</button>
     </div>
+    <div class="task-filter" id="taskFilter">
+      <button type="button" data-cat="all" class="active">All</button>
+      <button type="button" data-cat="work">💼 Work</button>
+      <button type="button" data-cat="personal">🏠 Personal</button>
+    </div>
     <form id="taskForm">
       <input id="taskInput" type="text" placeholder="Add a task…" autocomplete="off" maxlength="500" />
       <div class="task-form-row">
