@@ -774,7 +774,7 @@ datePicker.addEventListener('change', () => {
 
 // --- boot -----------------------------------------------------------------
 // --- tasks / todo panel ---------------------------------------------------
-const appEl = document.getElementById('app');
+// (appEl is declared earlier in this file)
 const taskPanel = document.getElementById('taskPanel');
 const tasksToggleBtn = document.getElementById('tasksToggleBtn');
 const taskForm = document.getElementById('taskForm');
