@@ -129,6 +129,7 @@ async function main() {
         const doc = {
           text: t.text || '',
           done: t.done === true,
+          dueDate: t.dueDate || null,
           updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date(),
         };
         const setOnInsert = { createdAt: t.createdAt ? new Date(t.createdAt) : new Date() };

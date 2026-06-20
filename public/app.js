@@ -779,6 +779,7 @@ const taskPanel = document.getElementById('taskPanel');
 const tasksToggleBtn = document.getElementById('tasksToggleBtn');
 const taskForm = document.getElementById('taskForm');
 const taskInput = document.getElementById('taskInput');
+const taskDue = document.getElementById('taskDue');
 const taskList = document.getElementById('taskList');
 const taskCount = document.getElementById('taskCount');
 const clearDoneBtn = document.getElementById('clearDoneBtn');
@@ -807,35 +808,59 @@ async function refreshTasks() {
     taskList.appendChild(li);
     return;
   }
+  const today = todayISO();
   for (const t of docs) {
+    const overdue = !t.done && t.dueDate && t.dueDate < today;
     const li = document.createElement('li');
-    li.className = 'task' + (t.done ? ' done' : '');
+    li.className = 'task' + (t.done ? ' done' : '') + (t.dueDate ? ' has-due' : '') + (overdue ? ' overdue' : '');
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = t.done;
     cb.addEventListener('change', () => toggleTask(t.id, cb.checked));
+
+    const main = document.createElement('div');
+    main.className = 'task-main';
     const span = document.createElement('span');
     span.className = 'task-text';
     span.textContent = t.text; // textContent — never inject HTML from user text
     span.title = 'Double-click to edit';
     span.addEventListener('dblclick', () => editTask(t, span));
+    // Per-task due date: native picker, low-key until set or hovered.
+    const due = document.createElement('input');
+    due.type = 'date';
+    due.className = 'task-due';
+    due.value = t.dueDate || '';
+    due.title = overdue ? 'Overdue' : 'Due date (optional)';
+    due.addEventListener('change', () => setDue(t.id, due.value));
+    main.append(span, due);
+
     const del = document.createElement('button');
     del.className = 'task-del';
     del.textContent = '✕';
     del.title = 'Delete task';
     del.addEventListener('click', () => deleteTask(t.id));
-    li.append(cb, span, del);
+    li.append(cb, main, del);
     taskList.appendChild(li);
   }
+}
+
+async function setDue(id, value) {
+  await fetch(`/api/tasks/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dueDate: value || null }),
+  });
+  refreshTasks();
 }
 
 taskForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = taskInput.value.trim();
   if (!text) return;
+  const dueDate = taskDue.value || null;
   taskInput.value = '';
+  taskDue.value = '';
   await fetch('/api/tasks', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, dueDate }),
   });
   refreshTasks();
 });

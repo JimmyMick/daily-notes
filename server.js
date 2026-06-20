@@ -511,13 +511,28 @@ app.delete('/api/references/:slug', async (req, res, next) => {
 // --- tasks / todo list ----------------------------------------------------
 // A single global checklist shown in the right panel. Open tasks first, then
 // completed; within each group, oldest first.
+
+// Normalize an optional due date. Returns null (no due date), a YYYY-MM-DD
+// string, or undefined if the input is present but invalid. The regex only
+// checks the shape, so also confirm it's a real calendar date (rejects e.g.
+// 2026-13-99 and 2026-02-30, which the regex alone would pass).
+function parseDue(v) {
+  if (v === null || v === '') return null;
+  if (typeof v !== 'string' || !DATE_RE.test(v)) return undefined;
+  const d = new Date(`${v}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v) return undefined;
+  return v;
+}
+
 app.get('/api/tasks', async (req, res, next) => {
   try {
     const docs = await tasks
-      .find({}, { projection: { text: 1, done: 1, createdAt: 1 } })
+      .find({}, { projection: { text: 1, done: 1, createdAt: 1, dueDate: 1 } })
       .sort({ done: 1, createdAt: 1 })
       .toArray();
-    res.json(docs.map((d) => ({ id: d._id.toString(), text: d.text, done: !!d.done, createdAt: d.createdAt })));
+    res.json(docs.map((d) => ({
+      id: d._id.toString(), text: d.text, done: !!d.done, createdAt: d.createdAt, dueDate: d.dueDate || null,
+    })));
   } catch (err) {
     next(err);
   }
@@ -527,9 +542,11 @@ app.post('/api/tasks', async (req, res, next) => {
   try {
     const text = typeof req.body.text === 'string' ? req.body.text.trim() : '';
     if (!text) return res.status(400).json({ error: 'text is required' });
+    const dueDate = req.body.dueDate === undefined ? null : parseDue(req.body.dueDate);
+    if (dueDate === undefined) return res.status(400).json({ error: 'dueDate must be YYYY-MM-DD' });
     const now = new Date();
-    const { insertedId } = await tasks.insertOne({ text, done: false, createdAt: now, updatedAt: now });
-    res.status(201).json({ id: insertedId.toString(), text, done: false, createdAt: now });
+    const { insertedId } = await tasks.insertOne({ text, done: false, dueDate, createdAt: now, updatedAt: now });
+    res.status(201).json({ id: insertedId.toString(), text, done: false, dueDate, createdAt: now });
   } catch (err) {
     next(err);
   }
@@ -542,6 +559,11 @@ app.patch('/api/tasks/:id', async (req, res, next) => {
     const set = { updatedAt: new Date() };
     if (typeof req.body.done === 'boolean') set.done = req.body.done;
     if (typeof req.body.text === 'string' && req.body.text.trim()) set.text = req.body.text.trim();
+    if ('dueDate' in req.body) {
+      const dueDate = parseDue(req.body.dueDate);
+      if (dueDate === undefined) return res.status(400).json({ error: 'dueDate must be YYYY-MM-DD' });
+      set.dueDate = dueDate; // null clears it
+    }
     const result = await tasks.updateOne({ _id }, { $set: set });
     if (result.matchedCount === 0) return res.status(404).json({ error: 'no such task' });
     res.json({ id: req.params.id, ...set });
