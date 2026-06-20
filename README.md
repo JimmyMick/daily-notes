@@ -17,6 +17,7 @@ A small, self-hosted app for keeping **one markdown note per day** in the browse
 - **Summarize** a note with a local **Ollama** model (✨ button)
 - **Email a note** (daily or reference) via Gmail (✉ button)
 - **Insert a timestamp** anchor with the 🕒 toolbar button (time-tag diary entries)
+- **Shareable links** — 🔗 Link copies a deep link to the current note (`#/YYYY-MM-DD` or `#/ref/<slug>`)
 - **Task list** — an expandable right panel (☑ Tasks) for a global todo checklist
 - **News ticker** — scrolling headlines from NPR, BBC, NRK, and ESPN along the bottom
 - **Scores ticker** — a second line with live/final sports scores (ESPN)
@@ -112,6 +113,18 @@ long cache lifetime (ids are stable).
 Images are included in [backups](#backup--restore) (under `backups/images/`) and
 embedded inline when a note is [emailed](#email-a-note), so screenshots render in
 the recipient's inbox.
+
+## Shareable links
+
+Each note has a deep link in the URL hash, so you can bookmark or share a
+specific day or reference note:
+
+- Daily note: `http://localhost:3000/#/2026-06-18`
+- Reference note: `http://localhost:3000/#/ref/<slug>`
+
+The **🔗 Link** button copies the current note's link to the clipboard. Opening
+a link loads that note directly, and browser back/forward navigate between
+notes you've viewed.
 
 ## Task list
 

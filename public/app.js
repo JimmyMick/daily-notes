@@ -95,6 +95,7 @@ const noteList = document.getElementById('noteList');
 const currentDateEl = document.getElementById('currentDate');
 const statusEl = document.getElementById('status');
 const archiveBtn = document.getElementById('archiveBtn');
+const copyLinkBtn = document.getElementById('copyLinkBtn');
 const showArchived = document.getElementById('showArchived');
 const notesHeading = document.getElementById('notesHeading');
 const refList = document.getElementById('refList');
@@ -178,6 +179,7 @@ async function loadDate(date) {
   } else {
     highlightActive();
   }
+  syncHash();
 }
 
 let currentArchived = false;
@@ -346,6 +348,7 @@ async function loadReference(slug) {
     loading = false;
   }
   highlightActive();
+  syncHash();
 }
 
 newRefBtn.addEventListener('click', async () => {
@@ -910,13 +913,67 @@ clearDoneBtn.addEventListener('click', async () => {
   refreshTasks();
 });
 
+// --- deep links (URL hash) -------------------------------------------------
+// #/YYYY-MM-DD links a daily note; #/ref/<slug> links a reference note. Keeping
+// the hash in sync makes notes bookmarkable/shareable and powers back/forward.
+let suppressHashChange = false;
+
+function currentHash() {
+  return mode === 'reference' && currentRef ? `#/ref/${currentRef.slug}` : `#/${currentDate}`;
+}
+
+// Reflect the current note in the URL without triggering a reload.
+function syncHash() {
+  const h = currentHash();
+  if (location.hash !== h) {
+    suppressHashChange = true; // our own change — don't treat as navigation
+    location.hash = h;
+  }
+}
+
+function parseHash() {
+  let m;
+  if ((m = location.hash.match(/^#\/ref\/(.+)$/))) return { kind: 'reference', slug: decodeURIComponent(m[1]) };
+  if ((m = location.hash.match(/^#\/(\d{4}-\d{2}-\d{2})$/))) return { kind: 'daily', date: m[1] };
+  return null;
+}
+
+// Load whatever the hash points at. Returns false if the hash isn't a note link.
+async function navigateFromHash() {
+  const target = parseHash();
+  if (!target) return false;
+  if (target.kind === 'daily') {
+    if (!(mode === 'daily' && currentDate === target.date)) await loadDate(target.date);
+  } else if (!(mode === 'reference' && currentRef && currentRef.slug === target.slug)) {
+    await loadReference(target.slug);
+  }
+  return true;
+}
+
+window.addEventListener('hashchange', () => {
+  if (suppressHashChange) { suppressHashChange = false; return; }
+  navigateFromHash();
+});
+
+// Copy a shareable link to the current note.
+copyLinkBtn.addEventListener('click', async () => {
+  syncHash();
+  try {
+    await navigator.clipboard.writeText(location.href);
+    statusEl.textContent = 'link copied ✓';
+  } catch (e) {
+    statusEl.textContent = location.href; // clipboard blocked — show it to copy manually
+  }
+});
+
 (async function init() {
   try { applyTasksOpen(localStorage.getItem('tasksOpen') === '1'); } catch (e) { /* closed by default */ }
   await loadModels();
   await loadEmailConfig();
   await refreshNoteList();
   await refreshRefList();
-  await loadDate(currentDate);
+  // Open the note named in the URL hash (shared/bookmarked link), else today.
+  if (!(await navigateFromHash())) await loadDate(currentDate);
   // Honor the saved show/hide preference (starts polling only when shown).
   try {
     const s = await (await fetch('/api/settings')).json();
