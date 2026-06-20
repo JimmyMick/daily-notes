@@ -276,6 +276,23 @@ body {
 #noteList li:hover, #searchResults li:hover, #refList li:hover { background: var(--hover); }
 #noteList li.active, #refList li.active { background: var(--active-bg); font-weight: 600; }
 
+/* Day rows carry a per-day archive/restore icon at the trailing edge. */
+#noteList .month-notes li { display: flex; align-items: center; gap: 6px; }
+#noteList .note-date { flex: 1; min-width: 0; }
+#noteList .note-archive {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0;
+}
+#noteList .month-notes li:hover .note-archive { opacity: .75; }
+#noteList .note-archive:hover { opacity: 1; }
+
 /* Month grouping for the daily-notes list. */
 #noteList li.month-group { padding: 0; border-radius: 0; cursor: default; }
 #noteList li.month-group:hover { background: none; }

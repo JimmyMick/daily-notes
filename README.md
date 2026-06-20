@@ -53,8 +53,7 @@ the sidebar, below the daily list.
 
 - **+ New** prompts for a title and drops you into the editor.
 - They share the same markdown editor and autosave as daily notes.
-- The header swaps the **🗄 Archive** button for **✎ Rename** and **🗑 Delete**
-  while a reference note is open.
+- The header shows **✎ Rename** and **🗑 Delete** while a reference note is open.
 - **Rename** changes only the display title. Each note keeps a fixed `slug`
   (derived from its first title), so renaming never breaks its backup file or
   links to it. **Delete** is permanent and asks for confirmation first.

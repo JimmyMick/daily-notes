@@ -94,7 +94,6 @@ const searchResults = document.getElementById('searchResults');
 const noteList = document.getElementById('noteList');
 const currentDateEl = document.getElementById('currentDate');
 const statusEl = document.getElementById('status');
-const archiveBtn = document.getElementById('archiveBtn');
 const copyLinkBtn = document.getElementById('copyLinkBtn');
 const showArchived = document.getElementById('showArchived');
 const notesHeading = document.getElementById('notesHeading');
@@ -166,7 +165,6 @@ async function loadDate(date) {
     const doc = await res.json();
     editor.value(doc.content || '');
     statusEl.textContent = doc.updatedAt ? 'loaded' : 'new note';
-    setArchiveButton(!!doc.archived);
   } finally {
     loading = false;
   }
@@ -180,15 +178,6 @@ async function loadDate(date) {
     highlightActive();
   }
   syncHash();
-}
-
-let currentArchived = false;
-function setArchiveButton(archived) {
-  currentArchived = archived;
-  archiveBtn.textContent = archived ? '♻ Restore' : '🗄 Archive';
-  archiveBtn.title = archived
-    ? 'Restore this day to the active list'
-    : 'Archive this day (kept in the store, hidden from the list)';
 }
 
 function formatHeading(date) {
@@ -254,11 +243,21 @@ async function refreshNoteList() {
 
     const sub = document.createElement('ul');
     sub.className = 'month-notes';
+    const viewingArchived = showArchived.checked;
     for (const doc of g.docs) {
       const li = document.createElement('li');
-      li.textContent = doc.date;
       li.dataset.date = doc.date;
       li.onclick = () => loadDate(doc.date);
+      const label = document.createElement('span');
+      label.className = 'note-date';
+      label.textContent = doc.date;
+      // Per-day archive (or restore, when viewing the archived list).
+      const arch = document.createElement('button');
+      arch.className = 'note-archive';
+      arch.textContent = viewingArchived ? '♻' : '🗄';
+      arch.title = viewingArchived ? 'Restore this day' : 'Archive this day';
+      arch.onclick = (e) => { e.stopPropagation(); archiveDate(doc.date, viewingArchived); };
+      li.append(label, arch);
       sub.appendChild(li);
     }
     groupLi.appendChild(sub);
@@ -269,24 +268,18 @@ async function refreshNoteList() {
 
 showArchived.addEventListener('change', refreshNoteList);
 
-// Archive / restore the current day.
-archiveBtn.addEventListener('click', async () => {
-  const action = currentArchived ? 'unarchive' : 'archive';
-  archiveBtn.disabled = true;
-  try {
-    const res = await fetch(`/api/notes/${currentDate}/${action}`, { method: 'POST' });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      statusEl.textContent = `⚠️ ${data.error || 'archive failed'}`;
-      return;
-    }
-    setArchiveButton(!currentArchived);
-    statusEl.textContent = currentArchived ? 'archived' : 'restored';
-    await refreshNoteList();
-  } finally {
-    archiveBtn.disabled = false;
+// Archive (or restore) a specific day from the note list.
+async function archiveDate(date, unarchive) {
+  const action = unarchive ? 'unarchive' : 'archive';
+  const res = await fetch(`/api/notes/${date}/${action}`, { method: 'POST' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    statusEl.textContent = `⚠️ ${data.error || 'archive failed'}`;
+    return;
   }
-});
+  statusEl.textContent = unarchive ? `restored ${date}` : `archived ${date}`;
+  await refreshNoteList();
+}
 
 function highlightActive() {
   // Date items are now nested inside month groups, so query them by attribute.
@@ -303,7 +296,6 @@ function highlightActive() {
 function setMode(m) {
   mode = m;
   const isRef = m === 'reference';
-  archiveBtn.hidden = isRef;
   renameRefBtn.hidden = !isRef;
   deleteRefBtn.hidden = !isRef;
 }
