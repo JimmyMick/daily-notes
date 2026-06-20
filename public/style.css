@@ -188,35 +188,11 @@ body {
 #taskList .task:hover .task-del { opacity: 1; }
 #taskList .task-del:hover { color: var(--live); }
 
-#tasksToggleBtn {
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 13px;
-  cursor: pointer;
-}
-#tasksToggleBtn:hover { background: var(--hover); }
-#tasksToggleBtn.active { background: var(--active-bg); border-color: var(--accent); }
-
 #sidebar h1 { font-size: 20px; margin: 0 0 20px; }
 #sidebar h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 22px 0 8px; }
 
 .archived-toggle { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 8px; cursor: pointer; }
 .archived-toggle input { margin: 0; }
-
-#archiveBtn {
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
-  cursor: pointer;
-}
-#archiveBtn:hover:not(:disabled) { background: var(--hover); }
-#archiveBtn:disabled { opacity: .6; cursor: default; }
 
 .control { margin-bottom: 16px; }
 .control label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
@@ -279,17 +255,6 @@ body {
 }
 #newRefBtn:hover { background: var(--hover); }
 
-#renameRefBtn, #deleteRefBtn {
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
-  cursor: pointer;
-}
-#renameRefBtn:hover, #deleteRefBtn:hover { background: var(--hover); }
-
 #searchResults { margin-top: 8px; }
 #searchResults li { border: 1px solid var(--border); margin-bottom: 6px; }
 #searchResults .r-date { font-weight: 600; font-size: 13px; }
@@ -309,27 +274,25 @@ header h2 { margin: 0; font-size: 20px; }
 .header-right { display: flex; align-items: center; gap: 12px; }
 #status { font-size: 13px; color: var(--muted); }
 
-#summarizeBtn {
+/* All header-right controls (buttons + the model select) share one look, so
+   they stay consistent as buttons are added. Per-button rules below only set
+   genuinely distinct state (e.g. the Tasks toggle's active highlight). */
+.header-right button,
+.header-right select {
   border: 1px solid var(--border-strong);
   background: var(--surface);
   color: var(--text);
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 13px;
+  line-height: 1.2;
   cursor: pointer;
 }
-#summarizeBtn:hover:not(:disabled) { background: var(--hover); }
-#summarizeBtn:disabled { opacity: .6; cursor: default; }
-
-#modelSelect {
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 8px;
-  font-size: 13px;
-  max-width: 180px;
-}
+.header-right button:hover:not(:disabled),
+.header-right select:hover { background: var(--hover); }
+.header-right button:disabled { opacity: .6; cursor: default; }
+#modelSelect { max-width: 180px; }
+#tasksToggleBtn.active { background: var(--active-bg); border-color: var(--accent); }
 
 .summary-head #insertSummary {
   margin-left: auto;
@@ -358,17 +321,6 @@ header h2 { margin: 0; font-size: 20px; }
   font-size: 14px; color: var(--muted);
 }
 #summaryBody { white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
-
-#themeBtn, #settingsBtn {
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 14px;
-  cursor: pointer;
-}
-#themeBtn:hover, #settingsBtn:hover { background: var(--hover); }
 
 #settingsOverlay {
   position: fixed;
