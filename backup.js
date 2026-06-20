@@ -104,6 +104,7 @@ async function runBackup({ mongoUri = MONGO_URI, dbName = DB_NAME, backupDir = B
         text: t.text,
         done: t.done === true,
         dueDate: t.dueDate || null,
+        category: t.category || 'personal',
         createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : null,
         updatedAt: t.updatedAt ? new Date(t.updatedAt).toISOString() : null,
       }));

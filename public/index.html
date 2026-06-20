@@ -139,7 +139,13 @@
     </div>
     <form id="taskForm">
       <input id="taskInput" type="text" placeholder="Add a task…" autocomplete="off" maxlength="500" />
-      <input id="taskDue" type="date" title="Optional due date" />
+      <div class="task-form-row">
+        <select id="taskCat" title="Category">
+          <option value="personal">🏠 Personal</option>
+          <option value="work">💼 Work</option>
+        </select>
+        <input id="taskDue" type="date" title="Optional due date" />
+      </div>
     </form>
     <ul id="taskList"></ul>
   </aside>

@@ -524,14 +524,21 @@ function parseDue(v) {
   return v;
 }
 
+// Task category. Returns a valid category or undefined if invalid.
+const TASK_CATEGORIES = ['work', 'personal'];
+function parseCategory(v) {
+  return TASK_CATEGORIES.includes(v) ? v : undefined;
+}
+
 app.get('/api/tasks', async (req, res, next) => {
   try {
     const docs = await tasks
-      .find({}, { projection: { text: 1, done: 1, createdAt: 1, dueDate: 1 } })
+      .find({}, { projection: { text: 1, done: 1, createdAt: 1, dueDate: 1, category: 1 } })
       .sort({ done: 1, createdAt: 1 })
       .toArray();
     res.json(docs.map((d) => ({
-      id: d._id.toString(), text: d.text, done: !!d.done, createdAt: d.createdAt, dueDate: d.dueDate || null,
+      id: d._id.toString(), text: d.text, done: !!d.done, createdAt: d.createdAt,
+      dueDate: d.dueDate || null, category: d.category || 'personal', // default for legacy rows
     })));
   } catch (err) {
     next(err);
@@ -544,9 +551,11 @@ app.post('/api/tasks', async (req, res, next) => {
     if (!text) return res.status(400).json({ error: 'text is required' });
     const dueDate = req.body.dueDate === undefined ? null : parseDue(req.body.dueDate);
     if (dueDate === undefined) return res.status(400).json({ error: 'dueDate must be YYYY-MM-DD' });
+    const category = req.body.category === undefined ? 'personal' : parseCategory(req.body.category);
+    if (category === undefined) return res.status(400).json({ error: 'category must be work or personal' });
     const now = new Date();
-    const { insertedId } = await tasks.insertOne({ text, done: false, dueDate, createdAt: now, updatedAt: now });
-    res.status(201).json({ id: insertedId.toString(), text, done: false, dueDate, createdAt: now });
+    const { insertedId } = await tasks.insertOne({ text, done: false, dueDate, category, createdAt: now, updatedAt: now });
+    res.status(201).json({ id: insertedId.toString(), text, done: false, dueDate, category, createdAt: now });
   } catch (err) {
     next(err);
   }
@@ -563,6 +572,11 @@ app.patch('/api/tasks/:id', async (req, res, next) => {
       const dueDate = parseDue(req.body.dueDate);
       if (dueDate === undefined) return res.status(400).json({ error: 'dueDate must be YYYY-MM-DD' });
       set.dueDate = dueDate; // null clears it
+    }
+    if ('category' in req.body) {
+      const category = parseCategory(req.body.category);
+      if (category === undefined) return res.status(400).json({ error: 'category must be work or personal' });
+      set.category = category;
     }
     const result = await tasks.updateOne({ _id }, { $set: set });
     if (result.matchedCount === 0) return res.status(404).json({ error: 'no such task' });

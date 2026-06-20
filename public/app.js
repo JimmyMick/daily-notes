@@ -783,7 +783,14 @@ const tasksToggleBtn = document.getElementById('tasksToggleBtn');
 const taskForm = document.getElementById('taskForm');
 const taskInput = document.getElementById('taskInput');
 const taskDue = document.getElementById('taskDue');
+const taskCat = document.getElementById('taskCat');
 const taskList = document.getElementById('taskList');
+
+// Category metadata: label/icon and the "other" category (for the move button).
+const TASK_CATS = {
+  work: { label: 'Work', icon: '💼', other: 'personal' },
+  personal: { label: 'Personal', icon: '🏠', other: 'work' },
+};
 const taskCount = document.getElementById('taskCount');
 const clearDoneBtn = document.getElementById('clearDoneBtn');
 
@@ -812,39 +819,65 @@ async function refreshTasks() {
     return;
   }
   const today = todayISO();
-  for (const t of docs) {
-    const overdue = !t.done && t.dueDate && t.dueDate < today;
-    const li = document.createElement('li');
-    li.className = 'task' + (t.done ? ' done' : '') + (t.dueDate ? ' has-due' : '') + (overdue ? ' overdue' : '');
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = t.done;
-    cb.addEventListener('change', () => toggleTask(t.id, cb.checked));
-
-    const main = document.createElement('div');
-    main.className = 'task-main';
-    const span = document.createElement('span');
-    span.className = 'task-text';
-    span.textContent = t.text; // textContent — never inject HTML from user text
-    span.title = 'Double-click to edit';
-    span.addEventListener('dblclick', () => editTask(t, span));
-    // Per-task due date: native picker, low-key until set or hovered.
-    const due = document.createElement('input');
-    due.type = 'date';
-    due.className = 'task-due';
-    due.value = t.dueDate || '';
-    due.title = overdue ? 'Overdue' : 'Due date (optional)';
-    due.addEventListener('change', () => setDue(t.id, due.value));
-    main.append(span, due);
-
-    const del = document.createElement('button');
-    del.className = 'task-del';
-    del.textContent = '✕';
-    del.title = 'Delete task';
-    del.addEventListener('click', () => deleteTask(t.id));
-    li.append(cb, main, del);
-    taskList.appendChild(li);
+  // Group into Work and Personal sections (docs are already sorted open-first).
+  for (const cat of ['work', 'personal']) {
+    const inCat = docs.filter((t) => (t.category || 'personal') === cat);
+    if (!inCat.length) continue;
+    const meta = TASK_CATS[cat];
+    const head = document.createElement('li');
+    head.className = 'task-group';
+    head.textContent = `${meta.icon} ${meta.label}`;
+    const n = document.createElement('span');
+    n.className = 'task-group-count';
+    n.textContent = `${inCat.filter((t) => !t.done).length} open`;
+    head.appendChild(n);
+    taskList.appendChild(head);
+    for (const t of inCat) taskList.appendChild(renderTask(t, today));
   }
+}
+
+// Build one task row.
+function renderTask(t, today) {
+  const cat = t.category || 'personal';
+  const meta = TASK_CATS[cat];
+  const overdue = !t.done && t.dueDate && t.dueDate < today;
+  const li = document.createElement('li');
+  li.className = 'task' + (t.done ? ' done' : '') + (t.dueDate ? ' has-due' : '') + (overdue ? ' overdue' : '');
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = t.done;
+  cb.addEventListener('change', () => toggleTask(t.id, cb.checked));
+
+  const main = document.createElement('div');
+  main.className = 'task-main';
+  const span = document.createElement('span');
+  span.className = 'task-text';
+  span.textContent = t.text; // textContent — never inject HTML from user text
+  span.title = 'Double-click to edit';
+  span.addEventListener('dblclick', () => editTask(t, span));
+  // Per-task due date: native picker, low-key until set or hovered.
+  const due = document.createElement('input');
+  due.type = 'date';
+  due.className = 'task-due';
+  due.value = t.dueDate || '';
+  due.title = overdue ? 'Overdue' : 'Due date (optional)';
+  due.addEventListener('change', () => setDue(t.id, due.value));
+  main.append(span, due);
+
+  // Move to the other category.
+  const move = document.createElement('button');
+  move.className = 'task-move';
+  move.textContent = TASK_CATS[meta.other].icon;
+  move.title = `Move to ${TASK_CATS[meta.other].label}`;
+  move.addEventListener('click', () => moveTask(t.id, meta.other));
+
+  const del = document.createElement('button');
+  del.className = 'task-del';
+  del.textContent = '✕';
+  del.title = 'Delete task';
+  del.addEventListener('click', () => deleteTask(t.id));
+  li.append(cb, main, move, del);
+  return li;
 }
 
 async function setDue(id, value) {
@@ -855,15 +888,24 @@ async function setDue(id, value) {
   refreshTasks();
 }
 
+async function moveTask(id, category) {
+  await fetch(`/api/tasks/${id}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category }),
+  });
+  refreshTasks();
+}
+
 taskForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = taskInput.value.trim();
   if (!text) return;
   const dueDate = taskDue.value || null;
+  const category = taskCat.value; // keep the selected category for the next add
   taskInput.value = '';
   taskDue.value = '';
   await fetch('/api/tasks', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, dueDate }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, dueDate, category }),
   });
   refreshTasks();
 });

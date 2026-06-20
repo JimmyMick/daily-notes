@@ -113,14 +113,24 @@ body {
 #taskPanel #clearDoneBtn:hover { background: var(--hover); }
 #taskPanel #clearDoneBtn[hidden] { display: none; }
 
-#taskForm { padding: 12px 16px; display: flex; gap: 6px; }
+#taskForm { padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
 #taskForm #taskInput {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   font-size: 14px;
+  background: var(--surface);
+  color: var(--text);
+}
+#taskForm .task-form-row { display: flex; gap: 6px; }
+#taskForm #taskCat {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-size: 12px;
   background: var(--surface);
   color: var(--text);
 }
@@ -133,6 +143,20 @@ body {
   background: var(--surface);
   color: var(--muted);
 }
+
+/* Category section headers in the task list. */
+#taskList .task-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+#taskList .task-group-count { margin-left: auto; font-weight: 400; text-transform: none; letter-spacing: 0; }
 
 #taskList { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; }
 #taskList .task-empty { color: var(--muted); font-size: 13px; padding: 8px; }
@@ -176,7 +200,8 @@ body {
   background: var(--surface);
   color: var(--text);
 }
-#taskList .task-del {
+#taskList .task-del,
+#taskList .task-move {
   border: none;
   background: none;
   color: var(--muted);
@@ -185,8 +210,10 @@ body {
   opacity: 0;
   flex-shrink: 0;
 }
-#taskList .task:hover .task-del { opacity: 1; }
+#taskList .task:hover .task-del,
+#taskList .task:hover .task-move { opacity: .8; }
 #taskList .task-del:hover { color: var(--live); }
+#taskList .task-move:hover { opacity: 1; }
 
 #sidebar h1 { font-size: 20px; margin: 0 0 20px; }
 #sidebar h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 22px 0 8px; }

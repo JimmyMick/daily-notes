@@ -130,6 +130,7 @@ async function main() {
           text: t.text || '',
           done: t.done === true,
           dueDate: t.dueDate || null,
+          category: t.category === 'work' ? 'work' : 'personal',
           updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date(),
         };
         const setOnInsert = { createdAt: t.createdAt ? new Date(t.createdAt) : new Date() };
