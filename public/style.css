@@ -270,8 +270,10 @@ header {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-header h2 { margin: 0; font-size: 20px; }
-.header-right { display: flex; align-items: center; gap: 12px; }
+/* The date title absorbs width changes (truncating if needed) so the buttons
+   keep their natural size when the task panel opens and narrows the header. */
+header h2 { margin: 0; font-size: 20px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 #status { font-size: 13px; color: var(--muted); }
 
 /* All header-right controls (buttons + the model select) share one look, so
@@ -286,6 +288,8 @@ header h2 { margin: 0; font-size: 20px; }
   padding: 6px 12px;
   font-size: 13px;
   line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
   cursor: pointer;
 }
 .header-right button:hover:not(:disabled),
