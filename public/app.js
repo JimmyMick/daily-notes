@@ -19,15 +19,17 @@ let currentRef = null; // { slug, title } when mode === 'reference'
 // and options as the email renderer, so preview and email stay consistent.
 if (window.marked) {
   marked.setOptions({ gfm: true });
-  // Open links from rendered notes in a new browser tab instead of navigating
-  // away from (and unloading) the Daily Notes app. Post-processing the HTML is
-  // version-robust across marked's renderer API changes; the negative lookahead
-  // avoids stomping any link that already sets target. rel guards the new tab.
+  // Open EXTERNAL links from rendered notes in a new browser tab instead of
+  // navigating away from (and unloading) the Daily Notes app. Only absolute
+  // http(s)/protocol-relative URLs get target=_blank; in-app #anchor and
+  // relative links stay in the same tab so jumping within a note works.
+  // Post-processing the HTML is version-robust across marked's renderer API
+  // changes; rel guards the new tab from window.opener access.
   marked.use({
     hooks: {
       postprocess(html) {
-        return html.replace(/<a (?![^>]*\btarget=)/g,
-          '<a target="_blank" rel="noopener noreferrer" ');
+        return html.replace(/<a href="((?:https?:)?\/\/[^"]*)"/g,
+          '<a href="$1" target="_blank" rel="noopener noreferrer"');
       },
     },
   });
