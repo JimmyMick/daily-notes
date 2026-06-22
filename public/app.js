@@ -17,7 +17,21 @@ let currentRef = null; // { slug, title } when mode === 'reference'
 // Render the preview with `marked` (GFM on) so markdown tables, strikethrough,
 // etc. render — EasyMDE's bundled parser doesn't do GFM tables. Same library
 // and options as the email renderer, so preview and email stay consistent.
-if (window.marked) marked.setOptions({ gfm: true });
+if (window.marked) {
+  marked.setOptions({ gfm: true });
+  // Open links from rendered notes in a new browser tab instead of navigating
+  // away from (and unloading) the Daily Notes app. Post-processing the HTML is
+  // version-robust across marked's renderer API changes; the negative lookahead
+  // avoids stomping any link that already sets target. rel guards the new tab.
+  marked.use({
+    hooks: {
+      postprocess(html) {
+        return html.replace(/<a (?![^>]*\btarget=)/g,
+          '<a target="_blank" rel="noopener noreferrer" ');
+      },
+    },
+  });
+}
 
 // Toolbar button: drop the current local time into the note as a bold anchor
 // (e.g. "**3:42 PM** "). Handy for time-tagging diary entries — especially in
