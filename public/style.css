@@ -520,6 +520,12 @@ main .EasyMDEContainer { flex: 1; min-height: 0; display: flex; flex-direction: 
 .editor-preview th, .editor-preview-side th { background: var(--th-bg); }
 /* Keep uploaded images (screenshots) from overflowing the preview. */
 .editor-preview img, .editor-preview-side img { max-width: 100%; height: auto; }
+/* GFM task-list items (- [ ] / - [x]): drop the list bullet and align the
+   rendered checkbox so outstanding/done items read as a clean checklist. */
+.editor-preview li:has(> input[type="checkbox"]),
+.editor-preview-side li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.2em; }
+.editor-preview li > input[type="checkbox"],
+.editor-preview-side li > input[type="checkbox"] { margin-right: .5em; vertical-align: middle; }
 /* Code blocks/inline code: theme the background and text together so they stay
    readable in both light and dark (EasyMDE's default preview code bg is light). */
 .editor-preview pre, .editor-preview-side pre,

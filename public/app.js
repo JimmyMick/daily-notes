@@ -54,6 +54,27 @@ const timestampButton = {
   },
 };
 
+// Toolbar buttons: insert a GFM task-list item — unchecked for something still
+// outstanding (☐) and checked for something accomplished (☑). They render as
+// checkboxes in the preview (marked GFM). Each goes on its own fresh line and
+// leaves the cursor after the marker so you can type the item right away.
+function taskItemButton(checked) {
+  return {
+    name: checked ? 'task-done' : 'task-todo',
+    title: checked ? 'Insert done item (checked box)' : 'Insert outstanding item (unchecked box)',
+    text: checked ? '☑' : '☐',
+    action: (ed) => {
+      const cm = ed.codemirror;
+      const cur = cm.getCursor();
+      const atLineStart = cur.ch === 0 && !cm.getLine(cur.line);
+      cm.replaceSelection(`${atLineStart ? '' : '\n'}- [${checked ? 'x' : ' '}] `);
+      cm.focus();
+    },
+  };
+}
+const taskTodoButton = taskItemButton(false);
+const taskDoneButton = taskItemButton(true);
+
 const editor = new EasyMDE({
   element: document.getElementById('editor'),
   spellChecker: false,
@@ -68,8 +89,19 @@ const editor = new EasyMDE({
   imageAccept: 'image/png, image/jpeg, image/gif, image/webp, image/*',
   imageUploadFunction: uploadImage,
   toolbar: ['bold', 'italic', 'heading', '|', 'unordered-list', 'ordered-list',
+    taskTodoButton, taskDoneButton, '|',
     'code', 'quote', 'table', timestampButton, '|', 'link', 'upload-image', 'preview', 'side-by-side', 'fullscreen'],
 });
+
+// Notes open in the rendered preview (read) view by default; the 👁 toolbar
+// toggle drops into the source editor. Route through EasyMDE.togglePreview so
+// the toolbar button's active state stays in sync. Call setPreview(false) before
+// editor.value() so the preview re-renders from the freshly loaded content.
+function setPreview(on) {
+  const active = editor.isPreviewActive();
+  if (on && !active) EasyMDE.togglePreview(editor);
+  else if (!on && active) EasyMDE.togglePreview(editor);
+}
 
 // Called by EasyMDE for button/paste/drag uploads. onSuccess(url) inserts the
 // markdown image; onError(msg) shows a message in EasyMDE's status line.
@@ -178,8 +210,11 @@ async function loadDate(date) {
   try {
     const res = await fetch(`/api/notes/${date}`);
     const doc = await res.json();
+    setPreview(false); // edit mode so value() refreshes the preview cleanly
     editor.value(doc.content || '');
     statusEl.textContent = doc.updatedAt ? 'loaded' : 'new note';
+    // Open existing notes in preview; keep empty/new notes in edit mode to type.
+    setPreview(!!(doc.content || '').trim());
   } finally {
     loading = false;
   }
@@ -349,8 +384,10 @@ async function loadReference(slug) {
     currentRef = { slug: doc.slug, title: doc.title };
     setMode('reference');
     currentDateEl.textContent = doc.title;
+    setPreview(false); // edit mode so value() refreshes the preview cleanly
     editor.value(doc.content || '');
     statusEl.textContent = 'loaded';
+    setPreview(!!(doc.content || '').trim());
   } finally {
     loading = false;
   }
