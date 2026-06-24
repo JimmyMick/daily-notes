@@ -526,6 +526,9 @@ main .EasyMDEContainer { flex: 1; min-height: 0; display: flex; flex-direction: 
 .editor-preview-side li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.2em; }
 .editor-preview li > input[type="checkbox"],
 .editor-preview-side li > input[type="checkbox"] { margin-right: .5em; vertical-align: middle; }
+/* Task boxes are interactive in the preview — flipping one updates the note. */
+.editor-preview input.task-check,
+.editor-preview-side input.task-check { cursor: pointer; }
 /* Code blocks/inline code: theme the background and text together so they stay
    readable in both light and dark (EasyMDE's default preview code bg is light). */
 .editor-preview pre, .editor-preview-side pre,

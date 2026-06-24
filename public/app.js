@@ -81,7 +81,7 @@ const editor = new EasyMDE({
   autofocus: true,
   status: false,
   placeholder: 'Write today\'s notes in markdown…',
-  previewRender: (plainText) => (window.marked ? marked.parse(plainText) : plainText),
+  previewRender: (plainText) => (window.marked ? renderPreview(plainText) : plainText),
   // Image upload: toolbar button + paste + drag-and-drop (great for screenshots).
   // Uploads go to /api/images and the returned URL is inserted as markdown.
   uploadImage: true,
@@ -102,6 +102,51 @@ function setPreview(on) {
   if (on && !active) EasyMDE.togglePreview(editor);
   else if (!on && active) EasyMDE.togglePreview(editor);
 }
+
+// Render the preview and make GFM task-list checkboxes interactive. marked
+// emits task boxes as disabled inputs; we strip `disabled` and tag them so a
+// click in the read view can flip the matching source line (see below).
+function renderPreview(plainText) {
+  return marked.parse(plainText).replace(
+    /<input ((?:checked="" )?)disabled="" type="checkbox">/g,
+    '<input $1type="checkbox" class="task-check">');
+}
+
+// Source line forms marked turns into a task checkbox: -, *, + or N. / N)
+// bullets followed by [ ], [x] or [X]. The Nth box in the preview maps to the
+// Nth such line in document order (marked renders them top-to-bottom).
+const TASK_LINE_RE = /^(\s*(?:[-*+]|\d+[.)])\s+\[)[ xX](\])/;
+
+// Flip the index-th task-list line in the editor source to checked/unchecked.
+// replaceRange edits just that line, so cursor/scroll are preserved and the
+// codemirror 'change' event fires the normal debounced autosave.
+function toggleSourceTask(index, checked) {
+  const cm = editor.codemirror;
+  const total = cm.lineCount();
+  let count = -1;
+  for (let i = 0; i < total; i++) {
+    const line = cm.getLine(i);
+    if (!TASK_LINE_RE.test(line)) continue;
+    count++;
+    if (count !== index) continue;
+    cm.replaceRange(line.replace(TASK_LINE_RE, `$1${checked ? 'x' : ' '}$2`),
+      { line: i, ch: 0 }, { line: i, ch: line.length });
+    return;
+  }
+}
+
+// Clicking a checkbox in the rendered preview toggles its source line. Delegated
+// because EasyMDE rebuilds the preview DOM each time it's shown; the box's own
+// native toggle handles the visual state, we just sync the markdown behind it.
+document.addEventListener('change', (e) => {
+  const box = e.target;
+  if (!(box instanceof HTMLInputElement) || !box.classList.contains('task-check')) return;
+  const container = box.closest('.editor-preview, .editor-preview-side');
+  if (!container) return;
+  const boxes = Array.from(container.querySelectorAll('input.task-check'));
+  const idx = boxes.indexOf(box);
+  if (idx >= 0) toggleSourceTask(idx, box.checked);
+});
 
 // Called by EasyMDE for button/paste/drag uploads. onSuccess(url) inserts the
 // markdown image; onError(msg) shows a message in EasyMDE's status line.
