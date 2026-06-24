@@ -408,12 +408,44 @@ async function refreshRefList() {
   }
   for (const doc of docs) {
     const li = document.createElement('li');
-    li.textContent = doc.title;
     li.dataset.slug = doc.slug;
+
+    const name = document.createElement('span');
+    name.className = 'ref-name';
+    name.textContent = doc.title;
+
+    // ✎ renames in place from the sidebar (no need to open the note); appears on
+    // row hover. stopPropagation so it doesn't also trigger the row's load click.
+    const renameBtn = document.createElement('button');
+    renameBtn.className = 'ref-rename';
+    renameBtn.textContent = '✎';
+    renameBtn.title = 'Rename this reference note';
+    renameBtn.onclick = (e) => { e.stopPropagation(); renameReference(doc.slug, doc.title); };
+
+    li.append(name, renameBtn);
     li.onclick = () => loadReference(doc.slug);
     refList.appendChild(li);
   }
   highlightActive();
+}
+
+// Prompt-rename a reference note by slug (the slug itself never changes, so
+// links/backups stay intact). Shared by the sidebar ✎ and the header Rename
+// button. Syncs the open-note header too when the renamed note is the open one.
+async function renameReference(slug, oldTitle) {
+  const title = prompt('Rename reference note:', oldTitle);
+  if (!title || !title.trim() || title.trim() === oldTitle) return;
+  const res = await fetch(`/api/references/${slug}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: title.trim() }),
+  });
+  if (!res.ok) { statusEl.textContent = '⚠️ rename failed'; return; }
+  if (currentRef && currentRef.slug === slug) {
+    currentRef.title = title.trim();
+    currentDateEl.textContent = currentRef.title;
+  }
+  refreshRefList();
 }
 
 async function loadReference(slug) {
@@ -454,19 +486,9 @@ newRefBtn.addEventListener('click', async () => {
   loadReference(doc.slug);
 });
 
-renameRefBtn.addEventListener('click', async () => {
+renameRefBtn.addEventListener('click', () => {
   if (!currentRef) return;
-  const title = prompt('Rename reference note:', currentRef.title);
-  if (!title || !title.trim() || title.trim() === currentRef.title) return;
-  const res = await fetch(`/api/references/${currentRef.slug}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: title.trim() }),
-  });
-  if (!res.ok) { statusEl.textContent = '⚠️ rename failed'; return; }
-  currentRef.title = title.trim();
-  currentDateEl.textContent = currentRef.title;
-  refreshRefList();
+  renameReference(currentRef.slug, currentRef.title);
 });
 
 deleteRefBtn.addEventListener('click', async () => {
