@@ -191,6 +191,7 @@ const showArchived = document.getElementById('showArchived');
 const notesHeading = document.getElementById('notesHeading');
 const refList = document.getElementById('refList');
 const newRefBtn = document.getElementById('newRefBtn');
+const newFolderBtn = document.getElementById('newFolderBtn');
 const renameRefBtn = document.getElementById('renameRefBtn');
 const deleteRefBtn = document.getElementById('deleteRefBtn');
 
@@ -395,38 +396,168 @@ function setMode(m) {
   deleteRefBtn.hidden = !isRef;
 }
 
+// Folder collapse state (membership = collapsed, so new folders default open).
+// The Ungrouped pseudo-folder uses this sentinel id.
+const collapsedFolders = new Set();
+const UNGROUPED = '__ungrouped__';
+function toggleFolder(id) {
+  if (collapsedFolders.has(id)) collapsedFolders.delete(id);
+  else collapsedFolders.add(id);
+  refreshRefList();
+}
+
+// One sidebar row for a reference note: title + a "move to folder" select and
+// the ✎ rename button (both revealed on hover). The select/rename stop click
+// propagation so they don't also trigger the row's open-note handler.
+function makeRefRow(doc, folderList) {
+  const li = document.createElement('li');
+  li.dataset.slug = doc.slug;
+
+  const name = document.createElement('span');
+  name.className = 'ref-name';
+  name.textContent = doc.title;
+
+  const move = document.createElement('select');
+  move.className = 'ref-move';
+  move.title = 'Move to folder';
+  const optU = document.createElement('option');
+  optU.value = ''; optU.textContent = '📁 Ungrouped';
+  move.appendChild(optU);
+  for (const f of folderList) {
+    const o = document.createElement('option');
+    o.value = f.id; o.textContent = f.name;
+    move.appendChild(o);
+  }
+  move.value = doc.folder || '';
+  move.onclick = (e) => e.stopPropagation();
+  move.onchange = (e) => { e.stopPropagation(); moveReference(doc.slug, move.value); };
+
+  const renameBtn = document.createElement('button');
+  renameBtn.className = 'ref-rename';
+  renameBtn.textContent = '✎';
+  renameBtn.title = 'Rename this reference note';
+  renameBtn.onclick = (e) => { e.stopPropagation(); renameReference(doc.slug, doc.title); };
+
+  li.append(name, move, renameBtn);
+  li.onclick = () => loadReference(doc.slug);
+  return li;
+}
+
+// A collapsible folder group (mirrors the daily list's month groups). Real
+// folders get rename/delete buttons; the Ungrouped group does not.
+function renderRefGroup(id, name, notes, deletable, folderList) {
+  const expanded = !collapsedFolders.has(id);
+  const groupLi = document.createElement('li');
+  groupLi.className = 'ref-group' + (expanded ? '' : ' collapsed');
+
+  const header = document.createElement('div');
+  header.className = 'ref-group-header';
+  const caret = document.createElement('span'); caret.className = 'caret'; caret.textContent = '▾';
+  const nm = document.createElement('span'); nm.className = 'ref-group-name'; nm.textContent = name;
+  const count = document.createElement('span'); count.className = 'ref-group-count'; count.textContent = notes.length;
+  header.append(caret, nm, count);
+  if (deletable) {
+    const ren = document.createElement('button');
+    ren.className = 'ref-group-btn'; ren.textContent = '✎'; ren.title = 'Rename folder';
+    ren.onclick = (e) => { e.stopPropagation(); renameFolder(id, name); };
+    const del = document.createElement('button');
+    del.className = 'ref-group-btn'; del.textContent = '✕'; del.title = 'Delete folder';
+    del.onclick = (e) => { e.stopPropagation(); deleteFolder(id, name); };
+    header.append(ren, del);
+  }
+  header.onclick = () => toggleFolder(id);
+  groupLi.appendChild(header);
+
+  const sub = document.createElement('ul');
+  sub.className = 'ref-group-notes';
+  for (const doc of notes) sub.appendChild(makeRefRow(doc, folderList));
+  groupLi.appendChild(sub);
+  return groupLi;
+}
+
 async function refreshRefList() {
-  const res = await fetch('/api/references');
-  const docs = await res.json();
+  const [refRes, folRes] = await Promise.all([fetch('/api/references'), fetch('/api/folders')]);
+  const docs = await refRes.json();
+  const folderList = await folRes.json();
   refList.innerHTML = '';
-  if (!docs.length) {
+
+  if (!docs.length && !folderList.length) {
     const li = document.createElement('li');
     li.textContent = 'No reference notes';
-    li.style.color = '#8a91a0';
-    li.style.cursor = 'default';
+    li.className = 'ref-empty';
     refList.appendChild(li);
+    highlightActive();
+    return;
   }
+
+  // No folders yet → keep the simple flat list to avoid sidebar clutter.
+  if (!folderList.length) {
+    for (const doc of docs) refList.appendChild(makeRefRow(doc, folderList));
+    highlightActive();
+    return;
+  }
+
+  // Group notes by folder; an unknown/missing folder id falls into Ungrouped.
+  const validIds = new Set(folderList.map((f) => f.id));
+  const byFolder = new Map();
+  const ungrouped = [];
   for (const doc of docs) {
-    const li = document.createElement('li');
-    li.dataset.slug = doc.slug;
-
-    const name = document.createElement('span');
-    name.className = 'ref-name';
-    name.textContent = doc.title;
-
-    // ✎ renames in place from the sidebar (no need to open the note); appears on
-    // row hover. stopPropagation so it doesn't also trigger the row's load click.
-    const renameBtn = document.createElement('button');
-    renameBtn.className = 'ref-rename';
-    renameBtn.textContent = '✎';
-    renameBtn.title = 'Rename this reference note';
-    renameBtn.onclick = (e) => { e.stopPropagation(); renameReference(doc.slug, doc.title); };
-
-    li.append(name, renameBtn);
-    li.onclick = () => loadReference(doc.slug);
-    refList.appendChild(li);
+    if (doc.folder && validIds.has(doc.folder)) {
+      if (!byFolder.has(doc.folder)) byFolder.set(doc.folder, []);
+      byFolder.get(doc.folder).push(doc);
+    } else {
+      ungrouped.push(doc);
+    }
+  }
+  for (const f of folderList) {
+    refList.appendChild(renderRefGroup(f.id, f.name, byFolder.get(f.id) || [], true, folderList));
+  }
+  if (ungrouped.length) {
+    refList.appendChild(renderRefGroup(UNGROUPED, 'Ungrouped', ungrouped, false, folderList));
   }
   highlightActive();
+}
+
+// Move a reference into a folder (id) or out of all folders ('' / null).
+async function moveReference(slug, folderId) {
+  const res = await fetch(`/api/references/${slug}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ folder: folderId || null }),
+  });
+  if (!res.ok) { statusEl.textContent = '⚠️ move failed'; return; }
+  refreshRefList();
+}
+
+async function createFolder() {
+  const name = prompt('New folder name:');
+  if (!name || !name.trim()) return;
+  const res = await fetch('/api/folders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name.trim() }),
+  });
+  if (!res.ok) { statusEl.textContent = '⚠️ folder create failed'; return; }
+  refreshRefList();
+}
+
+async function renameFolder(id, oldName) {
+  const name = prompt('Rename folder:', oldName);
+  if (!name || !name.trim() || name.trim() === oldName) return;
+  const res = await fetch(`/api/folders/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name.trim() }),
+  });
+  if (!res.ok) { statusEl.textContent = '⚠️ rename failed'; return; }
+  refreshRefList();
+}
+
+async function deleteFolder(id, name) {
+  if (!confirm(`Delete folder “${name}”? Its notes move to Ungrouped (they are not deleted).`)) return;
+  const res = await fetch(`/api/folders/${id}`, { method: 'DELETE' });
+  if (!res.ok) { statusEl.textContent = '⚠️ delete failed'; return; }
+  refreshRefList();
 }
 
 // Prompt-rename a reference note by slug (the slug itself never changes, so
@@ -485,6 +616,8 @@ newRefBtn.addEventListener('click', async () => {
   await refreshRefList();
   loadReference(doc.slug);
 });
+
+newFolderBtn.addEventListener('click', createFolder);
 
 renameRefBtn.addEventListener('click', () => {
   if (!currentRef) return;

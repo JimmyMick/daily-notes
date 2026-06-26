@@ -59,6 +59,25 @@ async function main() {
       restored++;
     }
 
+    // Restore reference-note folders (references/folders.json) before the notes,
+    // so the folder ids referenced in each note's frontmatter already exist.
+    const folders = client.db(DB_NAME).collection('folders');
+    let folderRestored = 0;
+    try {
+      const raw = await fs.readFile(path.join(BACKUP_DIR, 'references', 'folders.json'), 'utf8');
+      for (const f of JSON.parse(raw)) {
+        if (!f || !f.id) continue;
+        await folders.updateOne(
+          { id: f.id },
+          { $set: { name: f.name || f.id }, $setOnInsert: { createdAt: f.createdAt ? new Date(f.createdAt) : new Date() } },
+          { upsert: true },
+        );
+        folderRestored++;
+      }
+    } catch {
+      // no folders.json — nothing to restore
+    }
+
     // Restore reference notes from the references/ subfolder, upsert by slug.
     const references = client.db(DB_NAME).collection('references');
     const refDir = path.join(BACKUP_DIR, 'references');
@@ -79,6 +98,7 @@ async function main() {
         content: body.replace(/\n$/, ''),
         updatedAt: meta.updatedAt ? new Date(meta.updatedAt) : new Date(),
       };
+      if (meta.folder) doc.folder = meta.folder;
       const setOnInsert = { createdAt: meta.createdAt ? new Date(meta.createdAt) : new Date() };
       await references.updateOne({ slug }, { $set: doc, $setOnInsert: setOnInsert }, { upsert: true });
       refRestored++;
@@ -140,7 +160,7 @@ async function main() {
       }
     }
 
-    console.log(`Restored ${restored} note(s), ${refRestored} reference(s), ${imgRestored} image(s), and ${taskRestored} task(s) from ${BACKUP_DIR}`);
+    console.log(`Restored ${restored} note(s), ${refRestored} reference(s), ${folderRestored} folder(s), ${imgRestored} image(s), and ${taskRestored} task(s) from ${BACKUP_DIR}`);
   } finally {
     await client.close();
   }

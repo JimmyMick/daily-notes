@@ -35,6 +35,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 let notes; // collection handle, set on startup
 let references; // reference-notes collection handle (named, not dated)
+let folders; // reference-note folders collection handle (collapsible groups)
 let settingsCol; // settings collection handle
 let images; // uploaded images (binary) collection handle
 let tasks; // task/todo list collection handle
@@ -575,7 +576,7 @@ function slugify(s) {
 app.get('/api/references', async (req, res, next) => {
   try {
     const docs = await references
-      .find({}, { projection: { _id: 0, slug: 1, title: 1, updatedAt: 1 } })
+      .find({}, { projection: { _id: 0, slug: 1, title: 1, folder: 1, updatedAt: 1 } })
       .collation({ locale: 'en', strength: 1 })
       .sort({ title: 1 })
       .toArray();
@@ -616,11 +617,25 @@ app.get('/api/references/:slug', async (req, res, next) => {
 app.put('/api/references/:slug', async (req, res, next) => {
   try {
     const set = { updatedAt: new Date() };
+    const unset = {};
     if (typeof req.body.content === 'string') set.content = req.body.content;
     if (typeof req.body.title === 'string' && req.body.title.trim()) set.title = req.body.title.trim();
-    const result = await references.updateOne({ slug: req.params.slug }, { $set: set });
+    // Move into/out of a folder: a folder id assigns it; null/'' clears it
+    // (back to Ungrouped). Validate the target folder exists before assigning.
+    if ('folder' in req.body) {
+      const f = req.body.folder;
+      if (f === null || f === '') {
+        unset.folder = '';
+      } else if (typeof f === 'string') {
+        if (!(await folders.findOne({ id: f }))) return res.status(400).json({ error: 'no such folder' });
+        set.folder = f;
+      }
+    }
+    const update = { $set: set };
+    if (Object.keys(unset).length) update.$unset = unset;
+    const result = await references.updateOne({ slug: req.params.slug }, update);
     if (result.matchedCount === 0) return res.status(404).json({ error: 'no such reference' });
-    res.json({ slug: req.params.slug, ...set });
+    res.json({ slug: req.params.slug, ...set, ...('folder' in unset ? { folder: null } : {}) });
   } catch (err) {
     next(err);
   }
@@ -631,6 +646,63 @@ app.delete('/api/references/:slug', async (req, res, next) => {
   try {
     const result = await references.deleteOne({ slug: req.params.slug });
     if (result.deletedCount === 0) return res.status(404).json({ error: 'no such reference' });
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- reference-note folders -----------------------------------------------
+// Collapsible groups for reference notes. Like references, a folder has an
+// immutable id (slug of its name at creation) so it can be renamed without
+// breaking the `folder` link stored on each reference; notes with no folder
+// (or a missing one) fall into "Ungrouped" in the UI.
+app.get('/api/folders', async (req, res, next) => {
+  try {
+    const docs = await folders
+      .find({}, { projection: { _id: 0, id: 1, name: 1 } })
+      .collation({ locale: 'en', strength: 1 })
+      .sort({ name: 1 })
+      .toArray();
+    res.json(docs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/folders', async (req, res, next) => {
+  try {
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    const base = slugify(name) || 'folder';
+    let id = base;
+    for (let n = 2; await folders.findOne({ id }); n++) id = `${base}-${n}`;
+    await folders.insertOne({ id, name, createdAt: new Date() });
+    res.status(201).json({ id, name });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Rename a folder (id stays fixed, so note→folder links are unaffected).
+app.put('/api/folders/:id', async (req, res, next) => {
+  try {
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    if (!name) return res.status(400).json({ error: 'name is required' });
+    const result = await folders.updateOne({ id: req.params.id }, { $set: { name } });
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'no such folder' });
+    res.json({ id: req.params.id, name });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete a folder. Its notes are NOT deleted — they move back to Ungrouped.
+app.delete('/api/folders/:id', async (req, res, next) => {
+  try {
+    const result = await folders.deleteOne({ id: req.params.id });
+    if (result.deletedCount === 0) return res.status(404).json({ error: 'no such folder' });
+    await references.updateMany({ folder: req.params.id }, { $unset: { folder: '' } });
     res.json({ ok: true });
   } catch (err) {
     next(err);
@@ -788,6 +860,8 @@ async function start() {
   // One reference per slug; text index over title + content for future search.
   await references.createIndex({ slug: 1 }, { unique: true });
   await references.createIndex({ title: 'text', content: 'text' });
+  folders = db.collection('folders'); // collapsible groups for reference notes
+  await folders.createIndex({ id: 1 }, { unique: true });
   images = db.collection('images'); // uploaded image binaries, served by _id
   tasks = db.collection('tasks'); // global todo list
   await tasks.createIndex({ done: 1, order: 1, createdAt: 1 });

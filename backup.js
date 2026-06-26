@@ -40,6 +40,7 @@ function refFrontmatter(doc) {
     '---',
     `slug: ${doc.slug}`,
     `title: ${doc.title}`,
+    doc.folder ? `folder: ${doc.folder}` : null,
     doc.createdAt ? `createdAt: ${new Date(doc.createdAt).toISOString()}` : null,
     doc.updatedAt ? `updatedAt: ${new Date(doc.updatedAt).toISOString()}` : null,
     '---',
@@ -71,6 +72,16 @@ async function runBackup({ mongoUri = MONGO_URI, dbName = DB_NAME, backupDir = B
         const file = path.join(refDir, `${doc.slug}.md`);
         await fs.writeFile(file, refFrontmatter(doc) + (doc.content || '') + '\n', 'utf8');
       }
+    }
+    // Reference-note folders: small list, dumped as JSON so restore can recreate
+    // them (the `folder` id on each reference frontmatter points back here).
+    const fldrs = await db.collection('folders')
+      .find({}, { projection: { _id: 0, id: 1, name: 1, createdAt: 1 } })
+      .sort({ id: 1 }).toArray();
+    if (fldrs.length) {
+      await fs.mkdir(path.join(backupDir, 'references'), { recursive: true });
+      await fs.writeFile(path.join(backupDir, 'references', 'folders.json'),
+        JSON.stringify(fldrs, null, 2), 'utf8');
     }
     // Uploaded images: write each binary under images/<id>.<ext>, plus an
     // index.json carrying the metadata (ids, content types) so restore can put
