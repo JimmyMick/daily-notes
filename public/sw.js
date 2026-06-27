@@ -1,6 +1,6 @@
 /* Daily Notes service worker — installable PWA + light offline support.
  * Bump CACHE when shipping new static assets to force a refresh. */
-const CACHE = 'daily-notes-v1';
+const CACHE = 'daily-notes-v2';
 const SHELL = [
   '/',
   '/style.css',

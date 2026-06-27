@@ -869,11 +869,33 @@ function fillTicker(trackEl, tickerEl, items, pxPerSec) {
   trackEl.appendChild(buildTickerCopy(items));
   trackEl.appendChild(buildTickerCopy(items));
   tickerEl.hidden = false;
-  requestAnimationFrame(() => {
-    const oneCopy = trackEl.scrollWidth / 2;
-    trackEl.style.animationDuration = Math.max(20, Math.round(oneCopy / pxPerSec)) + 's';
-  });
+  trackEl.dataset.pps = pxPerSec; // remember speed so we can recompute on resize
+  requestAnimationFrame(() => setTickerDuration(trackEl));
 }
+
+// Derive the scroll duration from the track's real content width so speed stays
+// a steady px/s. Skips while the track is hidden (scrollWidth 0) so it never
+// locks in a bogus 20s — that was making the ticker race after rotating from a
+// portrait view where the bar was hidden.
+function setTickerDuration(trackEl) {
+  const pps = Number(trackEl.dataset.pps || 0);
+  const oneCopy = trackEl.scrollWidth / 2;
+  if (pps > 0 && oneCopy > 0) {
+    trackEl.style.animationDuration = Math.max(20, Math.round(oneCopy / pps)) + 's';
+  }
+}
+
+// Re-derive ticker speed after an orientation/size change (debounced).
+let tickerResizeTimer = null;
+function recomputeTickers() {
+  clearTimeout(tickerResizeTimer);
+  tickerResizeTimer = setTimeout(() => {
+    setTickerDuration(newsTrack);
+    setTickerDuration(scoresTrack);
+  }, 200);
+}
+window.addEventListener('resize', recomputeTickers);
+window.addEventListener('orientationchange', recomputeTickers);
 
 async function refreshNews() {
   try {
