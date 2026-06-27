@@ -725,9 +725,11 @@ main .EasyMDEContainer { flex: 1; min-height: 0; display: flex; flex-direction: 
     flex-shrink: 0; width: 36px; height: 32px; font-size: 16px; cursor: pointer;
     border: 1px solid var(--border-strong); border-radius: 8px;
     background: var(--surface); color: var(--text);
+    position: relative; z-index: 2; /* stay above the header-right row */
   }
-  /* Many header buttons — let them scroll sideways instead of overflowing. */
-  .header-right { gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Let the button row shrink into the leftover space and scroll sideways,
+     instead of overflowing and overlapping the ☰ (it's flex-shrink:0 by default). */
+  .header-right { gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; flex-shrink: 1; min-width: 0; }
   .header-right::-webkit-scrollbar { display: none; }
 
   /* Sidebar → off-canvas drawer; .sidebar-open (on #app) slides it in. */
