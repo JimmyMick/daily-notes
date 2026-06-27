@@ -706,3 +706,50 @@ main .EasyMDEContainer { flex: 1; min-height: 0; display: flex; flex-direction: 
 /* Live games: red league tag + a small dot so they stand out. */
 .ticker-item.live .src { color: var(--live); }
 .ticker-item.live .src::after { content: " ●"; font-size: 8px; vertical-align: middle; }
+
+/* ---- PWA / mobile --------------------------------------------------------
+   The header gets a ☰ button (hidden on desktop) that, on phones, toggles the
+   sidebar as a slide-in drawer so the editor owns the screen. */
+.header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.menu-btn { display: none; }
+
+@media (max-width: 760px) {
+  body { height: 100dvh; } /* avoid iOS Safari URL-bar 100vh jump */
+  header {
+    align-items: center;
+    padding: 12px 14px;
+    padding-top: calc(12px + env(safe-area-inset-top));
+  }
+  .menu-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; width: 36px; height: 32px; font-size: 16px; cursor: pointer;
+    border: 1px solid var(--border-strong); border-radius: 8px;
+    background: var(--surface); color: var(--text);
+  }
+  /* Many header buttons — let them scroll sideways instead of overflowing. */
+  .header-right { gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .header-right::-webkit-scrollbar { display: none; }
+
+  /* Sidebar → off-canvas drawer; .sidebar-open (on #app) slides it in. */
+  #sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
+    width: 84%; max-width: 320px;
+    transform: translateX(-100%); transition: transform .22s ease;
+    box-shadow: 2px 0 16px var(--shadow);
+    padding-top: calc(20px + env(safe-area-inset-top));
+  }
+  #app.sidebar-open #sidebar { transform: translateX(0); }
+  /* Dimmed click-away backdrop behind the open drawer (JS closes on tap). */
+  #app.sidebar-open::before {
+    content: ''; position: fixed; inset: 0; z-index: 35; background: var(--overlay);
+  }
+  main { width: 100%; min-width: 0; }
+  main .EasyMDEContainer { padding: 12px 14px; }
+
+  /* Task panel overlays from the right rather than squeezing the editor. */
+  #taskPanel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 40; box-shadow: -2px 0 16px var(--shadow); }
+  #app.tasks-open #taskPanel { width: 86%; max-width: 320px; }
+
+  /* News/scores tickers are noise on a small screen. */
+  footer#tickers { display: none; }
+}

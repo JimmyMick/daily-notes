@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Daily Notes</title>
+  <!-- PWA: installable + theming. Apple meta make "Add to Home Screen" run
+       full-screen with our icon (iOS ignores the manifest for the home icon). -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#2f6fed" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Daily Notes" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <!-- Apply the saved theme before paint to avoid a flash of the wrong theme. -->
   <script>
     (function () {
@@ -45,7 +53,10 @@
 
   <main>
     <header>
-      <h2 id="currentDate">—</h2>
+      <div class="header-left">
+        <button id="menuBtn" class="menu-btn" title="Notes &amp; references" aria-label="Open menu">☰</button>
+        <h2 id="currentDate">—</h2>
+      </div>
       <div class="header-right">
         <span id="status"></span>
         <select id="modelSelect" title="Ollama model used for summaries"></select>
@@ -196,5 +207,14 @@
        this UMD min build — an unpinned URL 404s and breaks the preview. -->
   <script src="https://unpkg.com/marked@14.1.4/marked.min.js"></script>
   <script src="/app.js"></script>
+  <!-- Register the service worker (PWA install + offline). No-op on plain HTTP
+       over a non-localhost host; works on localhost and HTTPS (e.g. tailscale serve). -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>

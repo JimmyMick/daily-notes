@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3b7bff"/>
+      <stop offset="1" stop-color="#2f6fed"/>
+    </linearGradient>
+  </defs>
+  <!-- full-bleed background so it works as a maskable icon -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- notebook page, centered within the maskable safe zone -->
+  <rect x="150" y="120" width="232" height="288" rx="22" fill="#ffffff"/>
+  <!-- spiral binding -->
+  <g fill="#2f6fed">
+    <circle cx="150" cy="168" r="14"/>
+    <circle cx="150" cy="232" r="14"/>
+    <circle cx="150" cy="296" r="14"/>
+    <circle cx="150" cy="360" r="14"/>
+  </g>
+  <!-- note lines -->
+  <g stroke="#9bbcff" stroke-width="14" stroke-linecap="round">
+    <line x1="196" y1="180" x2="344" y2="180"/>
+    <line x1="196" y1="228" x2="344" y2="228"/>
+    <line x1="196" y1="276" x2="344" y2="276"/>
+    <line x1="196" y1="324" x2="300" y2="324"/>
+  </g>
+</svg>

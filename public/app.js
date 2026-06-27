@@ -273,6 +273,7 @@ async function loadDate(date) {
   } else {
     highlightActive();
   }
+  closeDrawer(); // on mobile, dismiss the drawer once a day is opened
   syncHash();
 }
 
@@ -610,6 +611,7 @@ async function loadReference(slug) {
     loading = false;
   }
   highlightActive();
+  closeDrawer(); // on mobile, dismiss the drawer once a reference is opened
   syncHash();
 }
 
@@ -1078,6 +1080,25 @@ function applyTasksOpen(open) {
   if (open) refreshTasks();
 }
 tasksToggleBtn.addEventListener('click', () => applyTasksOpen(!appEl.classList.contains('tasks-open')));
+
+// --- mobile sidebar drawer (PWA) ------------------------------------------
+// On phones the sidebar is an off-canvas drawer toggled by the header ☰ button.
+// closeDrawer() is also called after picking a note so the editor takes over.
+const menuBtn = document.getElementById('menuBtn');
+const sidebarEl = document.getElementById('sidebar');
+function closeDrawer() { appEl.classList.remove('sidebar-open'); }
+if (menuBtn) {
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    appEl.classList.toggle('sidebar-open');
+  });
+  // Tap outside the open drawer (the dimmed area) to close it.
+  document.addEventListener('click', (e) => {
+    if (!appEl.classList.contains('sidebar-open')) return;
+    if (sidebarEl.contains(e.target) || e.target.closest('#menuBtn')) return;
+    closeDrawer();
+  });
+}
 
 async function refreshTasks() {
   let docs = [];
