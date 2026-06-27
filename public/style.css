@@ -384,6 +384,14 @@ body {
 .month-notes { list-style: none; margin: 0 0 4px; padding: 0 0 0 8px; }
 .month-group.collapsed .month-notes { display: none; }
 
+/* Color-code daily notes by day of week: workdays (Mon–Fri) light blue,
+   weekends (Sat/Sun) light green. No #noteList id here on purpose, so the
+   id-scoped :hover / .active backgrounds keep a higher specificity and win. */
+.month-notes li.workday { background: #e6f0fb; }
+.month-notes li.weekend { background: #e7f6ea; }
+[data-theme="dark"] .month-notes li.workday { background: rgba(56, 139, 253, 0.18); }
+[data-theme="dark"] .month-notes li.weekend { background: rgba(46, 160, 67, 0.20); }
+
 /* Reference-notes section header with its inline "+ New" button. */
 .ref-head { display: flex; align-items: center; justify-content: space-between; margin: 22px 0 8px; }
 #sidebar .ref-head h2 { margin: 0; }

@@ -290,6 +290,13 @@ const expandedMonths = new Set();
 let monthsInitialized = false;
 
 function monthKey(date) { return date.slice(0, 7); } // "2026-06"
+// True for Sat/Sun. Parse the Y-M-D parts into a LOCAL date (not new Date(str),
+// which parses as UTC and can shift the weekday across the date line).
+function isWeekend(date) {
+  const [y, m, d] = date.split('-').map(Number);
+  const day = new Date(y, m - 1, d).getDay(); // 0 Sun … 6 Sat
+  return day === 0 || day === 6;
+}
 function monthLabel(key) {
   const [y, m] = key.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -343,6 +350,9 @@ async function refreshNoteList() {
     for (const doc of g.docs) {
       const li = document.createElement('li');
       li.dataset.date = doc.date;
+      // Color-code by day of week: workdays (Mon–Fri) tend to be work notes,
+      // weekends (Sat/Sun) personal. CSS paints workday/weekend backgrounds.
+      li.classList.add(isWeekend(doc.date) ? 'weekend' : 'workday');
       li.onclick = () => loadDate(doc.date);
       const label = document.createElement('span');
       label.className = 'note-date';
