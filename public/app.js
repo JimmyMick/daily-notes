@@ -75,6 +75,26 @@ function taskItemButton(checked) {
 const taskTodoButton = taskItemButton(false);
 const taskDoneButton = taskItemButton(true);
 
+// Toolbar button: embed an image that already lives on the web by its URL — no
+// upload. Complements 'upload-image' (which stores a local file under
+// /api/images); this just drops a markdown image `![alt](url)` pointing at a
+// remote URL, which marked renders as an <img> in the preview/email. Prompts for
+// the URL and alt text (alt defaults to any selected text).
+const imageUrlButton = {
+  name: 'image-url',
+  title: 'Insert web image by URL',
+  text: '🌐',
+  action: (ed) => {
+    const cm = ed.codemirror;
+    const sel = cm.getSelection();
+    const url = (window.prompt('Image URL (https://…):', 'https://') || '').trim();
+    if (!url || url === 'https://') return;
+    const alt = (window.prompt('Alt text (optional):', sel || '') || '').trim();
+    cm.replaceSelection(`![${alt}](${url})`);
+    cm.focus();
+  },
+};
+
 const editor = new EasyMDE({
   element: document.getElementById('editor'),
   spellChecker: false,
@@ -90,7 +110,7 @@ const editor = new EasyMDE({
   imageUploadFunction: uploadImage,
   toolbar: ['bold', 'italic', 'heading', '|', 'unordered-list', 'ordered-list',
     taskTodoButton, taskDoneButton, '|',
-    'code', 'quote', 'table', timestampButton, '|', 'link', 'upload-image', 'preview', 'side-by-side', 'fullscreen'],
+    'code', 'quote', 'table', timestampButton, '|', 'link', 'upload-image', imageUrlButton, 'preview', 'side-by-side', 'fullscreen'],
 });
 
 // Notes open in the rendered preview (read) view by default; the 👁 toolbar
