@@ -596,7 +596,7 @@ main .EasyMDEContainer { flex: 1; min-height: 0; display: flex; flex-direction: 
 }
 .editor-preview th, .editor-preview-side th { background: var(--th-bg); }
 /* Keep uploaded images (screenshots) from overflowing the preview. */
-.editor-preview img, .editor-preview-side img { max-width: 100%; height: auto; }
+.editor-preview img, .editor-preview-side img { max-width: 100%; height: auto; border: 1px solid var(--text); }
 /* GFM task-list items (- [ ] / - [x]): drop the list bullet and align the
    rendered checkbox so outstanding/done items read as a clean checklist. */
 .editor-preview li:has(> input[type="checkbox"]),

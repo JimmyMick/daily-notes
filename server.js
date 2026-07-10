@@ -182,6 +182,16 @@ app.get('/api/news', async (req, res) => {
 });
 
 // Upload an image (from the editor's button, paste, or drag-and-drop). Stores
+// Map an image mimetype to a filename extension EasyMDE recognizes as an image
+// (png/jpg/jpeg/gif/svg/apng/avif/webp). Returns a leading-dot suffix, or '' for
+// an unknown type so we never append a bogus extension.
+const MIME_EXT = { 'image/jpeg': '.jpg', 'image/svg+xml': '.svg' };
+function extForMime(mime) {
+  if (MIME_EXT[mime]) return MIME_EXT[mime];
+  const sub = String(mime || '').split('/')[1] || '';
+  return /^[a-z0-9]+$/.test(sub) ? `.${sub}` : '';
+}
+
 // the binary in Mongo and returns a URL to embed as markdown. The field name is
 // "image"; multer rejects non-images via fileFilter (req.file is then absent).
 app.post('/api/images', upload.single('image'), async (req, res, next) => {
@@ -195,7 +205,12 @@ app.post('/api/images', upload.single('image'), async (req, res, next) => {
       createdAt: new Date(),
     };
     const { insertedId } = await images.insertOne(doc);
-    res.status(201).json({ url: `/api/images/${insertedId}` });
+    // Append the real image extension to the URL. EasyMDE decides whether an
+    // uploaded file is an image (→ `![](url)`) or a plain link by sniffing the
+    // extension off the END of the URL; an extensionless /api/images/<id> gets
+    // mis-inserted as a link AND corrupts the Link button's insert text. A
+    // trailing .png/.jpg/etc. makes it insert as an inline image instead.
+    res.status(201).json({ url: `/api/images/${insertedId}${extForMime(req.file.mimetype)}` });
   } catch (err) {
     next(err);
   }
@@ -222,7 +237,10 @@ async function collectNoteImages(markdown) {
 app.get('/api/images/:id', async (req, res, next) => {
   try {
     let _id;
-    try { _id = new ObjectId(req.params.id); } catch { return res.status(400).json({ error: 'bad image id' }); }
+    // Tolerate an optional file extension on the id (e.g. <id>.png); older notes
+    // reference the bare id, newer uploads carry an extension for editor embeds.
+    const idPart = String(req.params.id).replace(/\.[a-z0-9]+$/i, '');
+    try { _id = new ObjectId(idPart); } catch { return res.status(400).json({ error: 'bad image id' }); }
     const doc = await images.findOne({ _id });
     if (!doc) return res.status(404).json({ error: 'no such image' });
     res.setHeader('Content-Type', doc.contentType || 'application/octet-stream');
