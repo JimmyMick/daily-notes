@@ -484,9 +484,10 @@ function renderRefGroup(id, name, notes, deletable, folderList) {
   const header = document.createElement('div');
   header.className = 'ref-group-header';
   const caret = document.createElement('span'); caret.className = 'caret'; caret.textContent = '▾';
+  const icon = document.createElement('span'); icon.className = 'ref-group-icon'; icon.textContent = expanded ? '📂' : '📁';
   const nm = document.createElement('span'); nm.className = 'ref-group-name'; nm.textContent = name;
   const count = document.createElement('span'); count.className = 'ref-group-count'; count.textContent = notes.length;
-  header.append(caret, nm, count);
+  header.append(caret, icon, nm, count);
   if (deletable) {
     const ren = document.createElement('button');
     ren.className = 'ref-group-btn'; ren.textContent = '✎'; ren.title = 'Rename folder';

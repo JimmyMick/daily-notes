@@ -323,6 +323,7 @@ body {
 .ref-group-header:hover { background: var(--hover); }
 .ref-group-header .caret { font-size: 10px; color: var(--muted); transition: transform .15s; }
 .ref-group.collapsed .ref-group-header .caret { transform: rotate(-90deg); }
+.ref-group-header .ref-group-icon { font-size: 13px; line-height: 1; }
 .ref-group-header .ref-group-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ref-group-header .ref-group-count { margin-left: auto; color: var(--muted); font-size: 12px; }
 .ref-group-header .ref-group-btn {
