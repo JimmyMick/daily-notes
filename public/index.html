@@ -37,6 +37,12 @@
       <ul id="searchResults"></ul>
     </div>
 
+    <div class="tags-head">
+      <h2>Tags</h2>
+      <button id="clearTagBtn" title="Clear tag filter" hidden>✕ clear</button>
+    </div>
+    <ul id="tagList"></ul>
+
     <h2 id="notesHeading">All notes</h2>
     <label class="archived-toggle"><input type="checkbox" id="showArchived" /> Show archived</label>
     <ul id="noteList"></ul>
@@ -70,6 +76,8 @@
         <button id="settingsBtn" title="Settings">⚙</button>
       </div>
     </header>
+
+    <div id="noteTags" class="note-tags" hidden></div>
 
     <div id="chatOverlay" hidden>
       <div id="chatModal">

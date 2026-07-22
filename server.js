@@ -77,15 +77,46 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 // List dates that have a note (newest first) — powers the date sidebar.
 // ?archived=true lists archived notes instead of active ones.
+// Extract #hashtags from a note's markdown. A tag is '#' immediately followed
+// by a word character, preceded by start-of-line or whitespace. This ignores
+// markdown headings (which are '#' + a space) and mid-word/URL '#'. Tags are
+// lowercased and de-duped so search is case-insensitive.
+function extractTags(content) {
+  const set = new Set();
+  const re = /(?:^|\s)#([a-z0-9][\w-]*)/gi;
+  let m;
+  while ((m = re.exec(content || ''))) set.add(m[1].toLowerCase());
+  return [...set];
+}
+
 app.get('/api/notes', async (req, res, next) => {
   try {
     const wantArchived = req.query.archived === 'true';
     const filter = wantArchived ? { archived: true } : { archived: { $ne: true } };
+    // Optional ?tag= filter: only notes carrying that (lowercased) tag.
+    const tag = (req.query.tag || '').trim().toLowerCase();
+    if (tag) filter.tags = tag;
     const docs = await notes
-      .find(filter, { projection: { _id: 0, date: 1, updatedAt: 1, archived: 1 } })
+      .find(filter, { projection: { _id: 0, date: 1, updatedAt: 1, archived: 1, tags: 1 } })
       .sort({ date: -1 })
       .toArray();
     res.json(docs);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Distinct tags across active notes with a usage count, alphabetical. Powers
+// the sidebar tag list / tag browser.
+app.get('/api/tags', async (req, res, next) => {
+  try {
+    const rows = await notes.aggregate([
+      { $match: { archived: { $ne: true }, tags: { $exists: true, $ne: [] } } },
+      { $unwind: '$tags' },
+      { $group: { _id: '$tags', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+    ]).toArray();
+    res.json(rows.map((r) => ({ tag: r._id, count: r.count })));
   } catch (err) {
     next(err);
   }
@@ -547,13 +578,14 @@ app.put('/api/notes/:date', async (req, res, next) => {
     const { date } = req.params;
     if (!DATE_RE.test(date)) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
     const content = typeof req.body.content === 'string' ? req.body.content : '';
+    const tags = extractTags(content);
     const updatedAt = new Date();
     await notes.updateOne(
       { date },
-      { $set: { content, updatedAt }, $setOnInsert: { date, createdAt: updatedAt } },
+      { $set: { content, tags, updatedAt }, $setOnInsert: { date, createdAt: updatedAt } },
       { upsert: true }
     );
-    res.json({ date, content, updatedAt });
+    res.json({ date, content, tags, updatedAt });
   } catch (err) {
     next(err);
   }
@@ -874,6 +906,9 @@ async function start() {
   await notes.createIndex({ date: 1 }, { unique: true });
   // Full-text search over content.
   await notes.createIndex({ content: 'text' });
+  // Tag lookups (find notes by #hashtag).
+  await notes.createIndex({ tags: 1 });
+  await backfillNoteTags();
   references = db.collection('references');
   // One reference per slug; text index over title + content for future search.
   await references.createIndex({ slug: 1 }, { unique: true });
@@ -889,6 +924,19 @@ async function start() {
   app.listen(PORT, () => console.log(`daily-notes listening on :${PORT}`));
   rescheduleBackup();
   catchUpBackup();
+}
+
+// One-time backfill: compute tags for any note that predates the tags feature
+// (or was restored from a backup, which only carries content). Runs at startup;
+// notes saved afterwards get their tags set on every PUT.
+async function backfillNoteTags() {
+  const cursor = notes.find({ tags: { $exists: false } }, { projection: { date: 1, content: 1 } });
+  let n = 0;
+  for await (const d of cursor) {
+    await notes.updateOne({ date: d.date }, { $set: { tags: extractTags(d.content) } });
+    n++;
+  }
+  if (n) console.log(`[tags] backfilled ${n} note(s)`);
 }
 
 // Run a backup if the last one is missing or >24h old. Covers the macOS case

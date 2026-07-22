@@ -276,6 +276,35 @@ body {
 #noteList li:hover, #searchResults li:hover, #refList li:hover { background: var(--hover); }
 #noteList li.active, #refList li.active { background: var(--active-bg); font-weight: 600; }
 
+/* --- tags --------------------------------------------------------------- */
+.tags-head { display: flex; align-items: center; justify-content: space-between; margin: 22px 0 8px; }
+#sidebar .tags-head h2 { margin: 0; }
+#clearTagBtn {
+  background: none; border: none; color: var(--muted); cursor: pointer;
+  font-size: 12px; padding: 2px 4px; border-radius: 6px;
+}
+#clearTagBtn:hover { background: var(--hover); color: var(--text); }
+#tagList { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+#tagList li.empty { color: var(--muted); font-size: 12px; padding: 2px 0; cursor: default; }
+#tagList li.empty:hover { background: none; }
+.tag-item {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 999px; cursor: pointer; font-size: 12px;
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text);
+}
+.tag-item:hover { background: var(--hover); }
+.tag-item.active { background: var(--active-bg); border-color: var(--accent, var(--border-strong)); font-weight: 600; }
+.tag-item .tag-count { color: var(--muted); font-size: 11px; }
+.tag-item.active .tag-count { color: inherit; }
+
+/* Current note's tags, shown as clickable chips under the header. */
+.note-tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 20px 0; }
+.note-tag-chip {
+  padding: 3px 9px; border-radius: 999px; cursor: pointer; font-size: 12px;
+  background: var(--surface); border: 1px solid var(--border-strong); color: var(--text);
+}
+.note-tag-chip:hover { background: var(--hover); }
+
 /* Reference rows: title fills the row, a ✎ rename button sits at the trailing
    edge and fades in on hover (mirrors the daily list's archive icon). */
 #refList li { display: flex; align-items: center; gap: 6px; }

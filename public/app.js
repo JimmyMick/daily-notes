@@ -209,6 +209,9 @@ const statusEl = document.getElementById('status');
 const copyLinkBtn = document.getElementById('copyLinkBtn');
 const showArchived = document.getElementById('showArchived');
 const notesHeading = document.getElementById('notesHeading');
+const tagList = document.getElementById('tagList');
+const clearTagBtn = document.getElementById('clearTagBtn');
+const noteTagsEl = document.getElementById('noteTags');
 const refList = document.getElementById('refList');
 const newRefBtn = document.getElementById('newRefBtn');
 const newFolderBtn = document.getElementById('newFolderBtn');
@@ -232,12 +235,15 @@ async function saveDaily() {
   const content = editor.value();
   statusEl.textContent = 'saving…';
   try {
-    await fetch(`/api/notes/${currentDate}`, {
+    const res = await fetch(`/api/notes/${currentDate}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content }),
     });
+    const saved = await res.json().catch(() => ({}));
     statusEl.textContent = 'saved ✓';
+    renderNoteTags(saved.tags);
+    refreshTagList();
     refreshNoteList();
   } catch (e) {
     statusEl.textContent = 'save failed';
@@ -279,6 +285,7 @@ async function loadDate(date) {
     setPreview(false); // edit mode so value() refreshes the preview cleanly
     editor.value(doc.content || '');
     statusEl.textContent = doc.updatedAt ? 'loaded' : 'new note';
+    renderNoteTags(doc.tags);
     // Open existing notes in preview; keep empty/new notes in edit mode to type.
     setPreview(!!(doc.content || '').trim());
   } finally {
@@ -331,14 +338,20 @@ function toggleMonth(key) {
 
 async function refreshNoteList() {
   const archived = showArchived.checked;
-  const res = await fetch(`/api/notes?archived=${archived}`);
+  const url = `/api/notes?archived=${archived}` + (activeTag ? `&tag=${encodeURIComponent(activeTag)}` : '');
+  const res = await fetch(url);
   const docs = await res.json();
-  notesHeading.textContent = archived ? 'Archived notes' : 'All notes';
+  notesHeading.textContent = activeTag
+    ? `Tagged #${activeTag}`
+    : (archived ? 'Archived notes' : 'All notes');
   if (!monthsInitialized) { expandedMonths.add(monthKey(currentDate)); monthsInitialized = true; }
+  // When filtering by tag, matches can live in months that are collapsed; open
+  // every month with a hit so the filtered list is fully visible.
+  if (activeTag) docs.forEach((d) => expandedMonths.add(monthKey(d.date)));
   noteList.innerHTML = '';
   if (!docs.length) {
     const li = document.createElement('li');
-    li.textContent = archived ? 'No archived notes' : 'No notes yet';
+    li.textContent = activeTag ? `No notes tagged #${activeTag}` : (archived ? 'No archived notes' : 'No notes yet');
     li.className = 'empty';
     noteList.appendChild(li);
     return;
@@ -395,6 +408,74 @@ async function refreshNoteList() {
 
 showArchived.addEventListener('change', refreshNoteList);
 
+// --- tags -----------------------------------------------------------------
+// Notes are tagged with inline #hashtags in their markdown; the server extracts
+// them on save. This sidebar section lists every tag with a usage count, and
+// clicking one filters the note list to notes carrying that tag.
+let activeTag = null;
+
+async function refreshTagList() {
+  let tags = [];
+  try { tags = await (await fetch('/api/tags')).json(); } catch { tags = []; }
+  tagList.innerHTML = '';
+  if (!tags.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'No tags yet — add #tags in a note';
+    tagList.appendChild(li);
+    return;
+  }
+  for (const t of tags) {
+    const li = document.createElement('li');
+    li.className = 'tag-item' + (t.tag === activeTag ? ' active' : '');
+    li.dataset.tag = t.tag;
+    const name = document.createElement('span');
+    name.className = 'tag-name';
+    name.textContent = `#${t.tag}`;
+    const count = document.createElement('span');
+    count.className = 'tag-count';
+    count.textContent = t.count;
+    li.append(name, count);
+    li.onclick = () => filterByTag(t.tag);
+    tagList.appendChild(li);
+  }
+}
+
+// Toggle a tag filter: clicking the active tag clears it.
+function filterByTag(tag) {
+  activeTag = (activeTag === tag) ? null : tag;
+  clearTagBtn.hidden = !activeTag;
+  tagList.querySelectorAll('li[data-tag]').forEach((li) => {
+    li.classList.toggle('active', li.dataset.tag === activeTag);
+  });
+  refreshNoteList();
+}
+
+function clearTag() {
+  if (!activeTag) return;
+  activeTag = null;
+  clearTagBtn.hidden = true;
+  tagList.querySelectorAll('li[data-tag]').forEach((li) => li.classList.remove('active'));
+  refreshNoteList();
+}
+clearTagBtn.addEventListener('click', clearTag);
+
+// Render the current note's own tags as clickable chips under the header. Daily
+// notes only; hidden when there are none or when a reference note is open.
+function renderNoteTags(tags) {
+  noteTagsEl.innerHTML = '';
+  if (mode !== 'daily' || !tags || !tags.length) { noteTagsEl.hidden = true; return; }
+  for (const t of tags) {
+    const chip = document.createElement('button');
+    chip.className = 'note-tag-chip';
+    chip.textContent = `#${t}`;
+    chip.title = `Show notes tagged #${t}`;
+    chip.onclick = () => filterByTag(t);
+    noteTagsEl.appendChild(chip);
+  }
+  noteTagsEl.hidden = false;
+}
+
 // Archive (or restore) a specific day from the note list.
 async function archiveDate(date, unarchive) {
   const action = unarchive ? 'unarchive' : 'archive';
@@ -425,6 +506,8 @@ function setMode(m) {
   const isRef = m === 'reference';
   renameRefBtn.hidden = !isRef;
   deleteRefBtn.hidden = !isRef;
+  // The note-tags bar is for daily notes only; hide it in reference mode.
+  if (isRef) { noteTagsEl.innerHTML = ''; noteTagsEl.hidden = true; }
 }
 
 // Folder collapse state (membership = collapsed, so new folders default open).
@@ -1495,6 +1578,7 @@ chatForm.addEventListener('submit', async (e) => {
   await loadEmailConfig();
   await refreshNoteList();
   await refreshRefList();
+  await refreshTagList();
   // Open the note named in the URL hash (shared/bookmarked link), else today.
   if (!(await navigateFromHash())) await loadDate(currentDate);
   // Honor the saved show/hide preference (starts polling only when shown).
