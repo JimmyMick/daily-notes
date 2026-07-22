@@ -81,11 +81,21 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 // by a word character, preceded by start-of-line or whitespace. This ignores
 // markdown headings (which are '#' + a space) and mid-word/URL '#'. Tags are
 // lowercased and de-duped so search is case-insensitive.
+//
+// Not treated as tags: anything inside code (fenced ``` blocks or `inline`
+// spans), and a '#' escaped with a backslash — so you can reference e.g. a
+// Slack channel as `\#general` (renders as "#general") without tagging it.
 function extractTags(content) {
+  let text = String(content || '');
+  // Blank out code so #things inside it (e.g. #include, `#general`) don't tag.
+  text = text.replace(/```[\s\S]*?```/g, ' ').replace(/~~~[\s\S]*?~~~/g, ' ');
+  text = text.replace(/`[^`\n]*`/g, ' ');
+  // Honor an explicit backslash escape: \#general is not a tag.
+  text = text.replace(/\\#/g, ' ');
   const set = new Set();
   const re = /(?:^|\s)#([a-z0-9][\w-]*)/gi;
   let m;
-  while ((m = re.exec(content || ''))) set.add(m[1].toLowerCase());
+  while ((m = re.exec(text))) set.add(m[1].toLowerCase());
   return [...set];
 }
 
