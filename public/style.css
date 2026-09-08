@@ -377,6 +377,14 @@ body {
 
 /* Day rows carry a per-day archive/restore icon at the trailing edge. */
 #noteList .month-notes li { display: flex; align-items: center; gap: 6px; }
+#noteList .note-dow {
+  flex-shrink: 0;
+  width: 2.4em;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
 #noteList .note-date { flex: 1; min-width: 0; }
 #noteList .note-archive {
   flex-shrink: 0;

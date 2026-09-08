@@ -325,6 +325,12 @@ function isWeekend(date) {
   const day = new Date(y, m - 1, d).getDay(); // 0 Sun … 6 Sat
   return day === 0 || day === 6;
 }
+// Abbreviated weekday ("Mon", "Tue" …) for a Y-M-D string, parsed as a LOCAL
+// date so the weekday matches isWeekend (see the note above).
+function dayOfWeek(date) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short' });
+}
 function monthLabel(key) {
   const [y, m] = key.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -388,6 +394,9 @@ async function refreshNoteList() {
       // weekends (Sat/Sun) personal. CSS paints workday/weekend backgrounds.
       li.classList.add(isWeekend(doc.date) ? 'weekend' : 'workday');
       li.onclick = () => loadDate(doc.date);
+      const dow = document.createElement('span');
+      dow.className = 'note-dow';
+      dow.textContent = dayOfWeek(doc.date);
       const label = document.createElement('span');
       label.className = 'note-date';
       label.textContent = doc.date;
@@ -397,7 +406,7 @@ async function refreshNoteList() {
       arch.textContent = viewingArchived ? '♻' : '🗄';
       arch.title = viewingArchived ? 'Restore this day' : 'Archive this day';
       arch.onclick = (e) => { e.stopPropagation(); archiveDate(doc.date, viewingArchived); };
-      li.append(label, arch);
+      li.append(dow, label, arch);
       sub.appendChild(li);
     }
     groupLi.appendChild(sub);
@@ -1488,6 +1497,61 @@ copyLinkBtn.addEventListener('click', async () => {
   } catch (e) {
     statusEl.textContent = location.href; // clipboard blocked — show it to copy manually
   }
+});
+
+// --- print the current note -----------------------------------------------
+// Open a clean, minimal window with just the note's title and rendered
+// markdown, then trigger the browser's print dialog. Runs off the same
+// content that's in the editor so it prints exactly what's on screen.
+const printBtn = document.getElementById('printBtn');
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+printBtn.addEventListener('click', async () => {
+  // Flush any pending edit so the printed copy matches what's on screen.
+  clearTimeout(saveTimer);
+  if (!loading && editor.value()) await save();
+
+  const text = editor.value();
+  if (!text.trim()) { statusEl.textContent = '⚠️ nothing to print'; return; }
+
+  const title = mode === 'reference' && currentRef ? currentRef.title : formatHeading(currentDate);
+  const body = window.marked ? renderPreview(text) : escapeHtml(text);
+
+  const win = window.open('', '_blank');
+  if (!win) { statusEl.textContent = '⚠️ pop-up blocked — allow pop-ups to print'; return; }
+
+  win.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${escapeHtml(title)}</title>
+<style>
+  body { font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         color: #111; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+  h1.note-title { font-size: 1.5rem; margin: 0 0 1rem; padding-bottom: .5rem;
+                  border-bottom: 1px solid #ccc; }
+  img { max-width: 100%; }
+  pre { white-space: pre-wrap; background: #f4f4f4; padding: .75rem; border-radius: 4px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  table { border-collapse: collapse; }
+  th, td { border: 1px solid #ccc; padding: .3rem .6rem; }
+  input[type="checkbox"] { margin-right: .4rem; }
+  @media print { body { margin: 0; max-width: none; } }
+</style>
+</head>
+<body>
+<h1 class="note-title">${escapeHtml(title)}</h1>
+${body}
+</body>
+</html>`);
+  win.document.close();
+  // Wait for images/layout before invoking print, then close the tab after.
+  win.onload = () => { win.focus(); win.print(); };
+  statusEl.textContent = 'printing…';
 });
 
 // --- chatbot (ask your data) ----------------------------------------------
