@@ -332,6 +332,8 @@ app.post('/api/email', async (req, res, next) => {
     }
     const { kind, id } = req.body;
     const to = typeof req.body.to === 'string' ? req.body.to.trim() : '';
+    // Optional message to the recipient, shown above an <hr> before the note.
+    const message = typeof req.body.message === 'string' ? req.body.message.trim() : '';
     // Allow a comma-separated list; validate each address.
     const recipients = to.split(',').map((s) => s.trim()).filter(Boolean);
     if (!recipients.length || !recipients.every((r) => EMAIL_RE.test(r))) {
@@ -355,9 +357,15 @@ app.post('/api/email', async (req, res, next) => {
       return res.status(400).json({ error: 'kind must be "daily" or "reference"' });
     }
 
+    // BCC the sender in on notes going to someone else, so there's a copy in
+    // their own inbox. Skip it when they're already a (case-insensitive) recipient.
+    const self = (email.from || '').trim();
+    const toSelf = recipients.some((r) => r.toLowerCase() === self.toLowerCase());
+    const bcc = self && !toSelf ? self : undefined;
+
     try {
       const noteImages = await collectNoteImages(markdown);
-      await email.sendNoteEmail({ to: recipients.join(', '), subject, markdown, images: noteImages });
+      await email.sendNoteEmail({ to: recipients.join(', '), subject, markdown, message, images: noteImages, bcc });
     } catch (err) {
       // Surface SMTP/auth failures clearly instead of the generic 500 handler.
       return res.status(502).json({ error: 'send failed', detail: err.message });

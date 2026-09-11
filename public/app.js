@@ -887,6 +887,27 @@ async function loadEmailConfig() {
   }
 }
 
+// Email modal: recipient + an optional multiline message (rendered above an
+// <hr>, then the note). The target note (kind/id) is captured when the modal
+// opens so the send uses what was on screen at that moment.
+const emailOverlay = document.getElementById('emailOverlay');
+const emailModal = document.getElementById('emailModal');
+const emailToInput = document.getElementById('emailTo');
+const emailMessageInput = document.getElementById('emailMessage');
+const emailModalStatus = document.getElementById('emailModalStatus');
+const sendEmailBtn = document.getElementById('sendEmail');
+let emailTarget = null; // { kind, id } for the note being emailed
+
+function closeEmailModal() {
+  emailOverlay.hidden = true;
+  emailTarget = null;
+}
+document.getElementById('closeEmail').addEventListener('click', closeEmailModal);
+emailOverlay.addEventListener('click', (e) => { if (e.target === emailOverlay) closeEmailModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !emailOverlay.hidden) closeEmailModal();
+});
+
 emailBtn.addEventListener('click', async () => {
   // Flush any pending edit so the emailed copy matches what's on screen.
   clearTimeout(saveTimer);
@@ -901,27 +922,43 @@ emailBtn.addEventListener('click', async () => {
     return;
   }
 
-  const to = prompt('Email this note to:', emailConfig.defaultTo || '');
-  if (!to || !to.trim()) return;
+  emailTarget = { kind, id };
+  emailToInput.value = emailConfig.defaultTo || '';
+  emailMessageInput.value = '';
+  emailModalStatus.textContent = '';
+  emailOverlay.hidden = false;
+  emailToInput.focus();
+  emailToInput.select();
+});
 
-  statusEl.textContent = 'emailing…';
-  emailBtn.disabled = true;
+emailModal.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!emailTarget) return;
+
+  const to = emailToInput.value.trim();
+  if (!to) { emailModalStatus.textContent = '⚠️ a recipient is required'; emailToInput.focus(); return; }
+  const message = emailMessageInput.value.trim();
+  const { kind, id } = emailTarget;
+
+  emailModalStatus.textContent = 'sending…';
+  sendEmailBtn.disabled = true;
   try {
     const res = await fetch('/api/email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kind, id, to: to.trim() }),
+      body: JSON.stringify({ kind, id, to, message }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      statusEl.textContent = `⚠️ ${data.error || 'email failed'}${data.detail ? ': ' + data.detail : ''}`;
+      emailModalStatus.textContent = `⚠️ ${data.error || 'email failed'}${data.detail ? ': ' + data.detail : ''}`;
       return;
     }
+    closeEmailModal();
     statusEl.textContent = `emailed to ${data.to} ✓`;
-  } catch (e) {
-    statusEl.textContent = '⚠️ email failed';
+  } catch (err) {
+    emailModalStatus.textContent = '⚠️ email failed';
   } finally {
-    emailBtn.disabled = false;
+    sendEmailBtn.disabled = false;
   }
 });
 

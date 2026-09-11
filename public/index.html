@@ -163,6 +163,29 @@
         </p>
       </div>
     </div>
+    <div id="emailOverlay" hidden>
+      <form id="emailModal">
+        <div class="settings-head">
+          <strong>Email note</strong>
+          <button type="button" id="closeEmail" title="Close">✕</button>
+        </div>
+
+        <label class="setting setting-col">
+          <span>To <small>comma-separate multiple recipients</small></span>
+          <input type="text" id="emailTo" placeholder="you@example.com" autocomplete="off" />
+        </label>
+
+        <label class="setting setting-col">
+          <span>Message <small>optional — shown above the note</small></span>
+          <textarea id="emailMessage" rows="5" placeholder="Add a message to the recipient…"></textarea>
+        </label>
+
+        <div class="settings-actions">
+          <span id="emailModalStatus"></span>
+          <button type="submit" id="sendEmail" class="primary">Send</button>
+        </div>
+      </form>
+    </div>
     <div id="summaryPanel" hidden>
       <div class="summary-head">
         <strong>Summary</strong>

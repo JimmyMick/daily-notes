@@ -51,8 +51,16 @@ const TH_STYLE = CELL_STYLE + ';background:#f6f8fa;font-weight:600';
 // map is rewritten to a `cid:` reference and returned as an inline attachment,
 // so the picture renders in the recipient's inbox (the server URL wouldn't be
 // reachable from there). Returns { html, attachments }.
-function renderEmail(md, images) {
-  let body = marked.parse(String(md || ''));
+function renderEmail(md, images, message) {
+  // An optional recipient message renders above the note, separated by an <hr>.
+  // Both parts are parsed as markdown so links/formatting in the message work.
+  const parts = [];
+  if (message && message.trim()) {
+    parts.push(marked.parse(String(message)));
+    parts.push('<hr />');
+  }
+  parts.push(marked.parse(String(md || '')));
+  let body = parts.join('\n');
   // Inject inline styles. marked may emit `<th align="center">`, so match the
   // tag name followed by a space or `>` and insert the style attribute first.
   body = body
@@ -111,13 +119,20 @@ function renderEmail(md, images) {
 
 // Send one note. `to` may be a comma-separated list (nodemailer accepts that).
 // `images` (optional) maps image id -> { contentType, buffer } for inlining.
-async function sendNoteEmail({ to, subject, markdown, images }) {
-  const { html, attachments } = renderEmail(markdown, images || {});
+// `message` (optional) is a recipient note shown above an <hr>, then the note.
+// `bcc` (optional) blind-copies an address (used to copy the sender in).
+async function sendNoteEmail({ to, subject, markdown, message, images, bcc }) {
+  const { html, attachments } = renderEmail(markdown, images || {}, message);
+  // Mirror the message in the plaintext part, separated by a rule.
+  const text = message && message.trim()
+    ? `${message.trim()}\n\n----------\n\n${markdown}`
+    : markdown;
   const info = await getTransporter().sendMail({
     from: GMAIL_USER,
     to,
+    ...(bcc ? { bcc } : {}),
     subject,
-    text: markdown,
+    text,
     html,
     attachments,
   });
