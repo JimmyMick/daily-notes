@@ -61,13 +61,18 @@ function renderEmail(md, images) {
     .replace(/<td(\s|>)/g, `<td style="${CELL_STYLE}"$1`);
 
   const attachments = [];
-  body = body.replace(/src="\/api\/images\/([0-9a-fA-F]{24})"/g, (full, id) => {
+  // Match /api/images/<id> with an OPTIONAL extension (e.g. <id>.png). Uploaded
+  // images embed the URL WITH an extension (server appends one so EasyMDE inlines
+  // them), so the extension must be tolerated here or the src is never rewritten
+  // to a cid: and the image silently fails to send. `ext` (with its leading dot)
+  // is carried into the attachment filename for a sensible name in the inbox.
+  body = body.replace(/src="\/api\/images\/([0-9a-fA-F]{24})(\.[a-z0-9]+)?"/gi, (full, id, ext) => {
     const img = images && images[id];
     if (!img) return full; // unknown/deleted image — leave the URL as-is
     const cid = `img-${id}`;
     if (!attachments.some((a) => a.cid === cid)) {
       attachments.push({
-        filename: id,
+        filename: `${id}${ext || ''}`,
         content: img.buffer,
         contentType: img.contentType || 'application/octet-stream',
         cid,
